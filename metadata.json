@@ -1,0 +1,6 @@
+{
+  "name": "TripCheck",
+  "description": "AI Travel Itinerary Generator & Intelligent Route Planner — Generate comprehensive day-by-day travel plans from any origin to destination with high-resolution 2D interactive route maps, weather forecasts, curated stays, culinary guides, and multi-language translation.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
