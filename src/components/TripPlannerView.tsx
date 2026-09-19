@@ -1,4 +1,6 @@
+import { useDialog } from '../hooks/useDialog';
 import React, { useState } from 'react';
+import { dateAfter } from '../utils/trip';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trip, ActivityItem, ItineraryDay } from '../types';
 import { InteractiveMap } from './InteractiveMap';
@@ -20,7 +22,7 @@ import {
   Camera,
   Layers,
   Sparkles,
-  Map as MapIcon
+  Map as MapIcon,
 } from 'lucide-react';
 
 interface TripPlannerViewProps {
@@ -36,25 +38,30 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
 }) => {
   const [selectedDayNum, setSelectedDayNum] = useState<number>(1);
   const [showAddActivityModal, setShowAddActivityModal] = useState(false);
+  const dialogRef = useDialog(showAddActivityModal, () =>
+    setShowAddActivityModal(false)
+  );
   const [showMap, setShowMap] = useState(true);
   const [mapEngine, setMapEngine] = useState<'mapbox' | 'leaflet'>('mapbox');
 
   // New activity state
   const [newTitle, setNewTitle] = useState('');
   const [newTime, setNewTime] = useState('10:00');
-  const [newCategory, setNewCategory] = useState<ActivityItem['category']>('sightseeing');
+  const [newCategory, setNewCategory] =
+    useState<ActivityItem['category']>('sightseeing');
   const [newLocation, setNewLocation] = useState('');
   const [newCost, setNewCost] = useState('');
   const [newNotes, setNewNotes] = useState('');
 
-  const currentDay = trip.days.find(d => d.dayNumber === selectedDayNum) || trip.days[0];
+  const currentDay =
+    trip.days.find((d) => d.dayNumber === selectedDayNum) || trip.days[0];
 
   const handleToggleComplete = (dayNum: number, activityId: string) => {
-    const updatedDays = trip.days.map(d => {
+    const updatedDays = trip.days.map((d) => {
       if (d.dayNumber !== dayNum) return d;
       return {
         ...d,
-        activities: d.activities.map(a =>
+        activities: d.activities.map((a) =>
           a.id === activityId ? { ...a, isCompleted: !a.isCompleted } : a
         ),
       };
@@ -63,11 +70,11 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
   };
 
   const handleDeleteActivity = (dayNum: number, activityId: string) => {
-    const updatedDays = trip.days.map(d => {
+    const updatedDays = trip.days.map((d) => {
       if (d.dayNumber !== dayNum) return d;
       return {
         ...d,
-        activities: d.activities.filter(a => a.id !== activityId),
+        activities: d.activities.filter((a) => a.id !== activityId),
       };
     });
     onUpdateTrip({ ...trip, days: updatedDays });
@@ -75,13 +82,12 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
 
   const handleAddActivity = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
-
-    // Approximate lat/lng nearby for visualization
-    const baseLat = currentDay.activities[0]?.lat || 35.6762;
-    const baseLng = currentDay.activities[0]?.lng || 139.6503;
-    const jitterLat = baseLat + (Math.random() - 0.5) * 0.04;
-    const jitterLng = baseLng + (Math.random() - 0.5) * 0.04;
+    if (
+      !newTitle.trim() ||
+      !currentDay ||
+      (newCost && (!Number.isFinite(Number(newCost)) || Number(newCost) < 0))
+    )
+      return;
 
     const newActivity: ActivityItem = {
       id: `act-${Date.now()}`,
@@ -89,16 +95,16 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
       time: newTime,
       category: newCategory,
       locationName: newLocation.trim() || 'Central District',
-      lat: jitterLat,
-      lng: jitterLng,
       cost: parseFloat(newCost) || 0,
       notes: newNotes.trim(),
       isCompleted: false,
     };
 
-    const updatedDays = trip.days.map(d => {
-      if (d.dayNumber !== selectedDayNum) return d;
-      const sorted = [...d.activities, newActivity].sort((a, b) => a.time.localeCompare(b.time));
+    const updatedDays = trip.days.map((d) => {
+      if (d.dayNumber !== currentDay.dayNumber) return d;
+      const sorted = [...d.activities, newActivity].sort((a, b) =>
+        a.time.localeCompare(b.time)
+      );
       return { ...d, activities: sorted };
     });
 
@@ -116,11 +122,15 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
     const newDayNum = trip.days.length + 1;
     const newDay: ItineraryDay = {
       dayNumber: newDayNum,
-      date: `Day ${newDayNum}`,
-      theme: 'Exploration & Free Discovery',
+      date: dateAfter(trip.startDate, newDayNum - 1),
+      theme: 'A day to make your own',
       activities: [],
     };
-    onUpdateTrip({ ...trip, days: [...trip.days, newDay] });
+    onUpdateTrip({
+      ...trip,
+      endDate: newDay.date,
+      days: [...trip.days, newDay],
+    });
     setSelectedDayNum(newDayNum);
   };
 
@@ -145,9 +155,17 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {trip.planningNote && (
+        <p
+          role="status"
+          className="p-4 rounded-xl bg-amber-50 text-amber-800 text-sm"
+        >
+          {trip.planningNote}
+        </p>
+      )}
       {/* Trip Header Banner */}
       <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl">
-        <div className="relative h-56 sm:h-72 w-full overflow-hidden">
+        <div className="relative h-80 sm:h-72 w-full overflow-hidden">
           <img
             src={trip.coverImage}
             alt={trip.title}
@@ -159,16 +177,20 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold uppercase">
-                  Active Expedition
+                  Your trip
                 </span>
                 <span className="text-xs text-slate-300 font-medium">
                   {trip.startDate} – {trip.endDate}
                 </span>
               </div>
-              <h2 className="text-2xl sm:text-4xl font-extrabold text-white">{trip.title}</h2>
+              <h2 className="text-2xl sm:text-4xl font-extrabold text-white">
+                {trip.title}
+              </h2>
               <div className="flex items-center gap-2 text-slate-300 text-sm mt-1">
                 <MapPin className="w-4 h-4 text-cyan-400" />
-                <span>{trip.destination} • {trip.travelers} Travelers</span>
+                <span>
+                  {trip.destination} • {trip.travelers} Travelers
+                </span>
               </div>
             </div>
 
@@ -178,7 +200,7 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600/90 hover:bg-purple-600 text-white font-semibold text-xs border border-purple-400/30 transition shadow-lg cursor-pointer"
               >
                 <Sparkles className="w-4 h-4 text-purple-200" />
-                <span>Optimize with AI</span>
+                <span>Get trip ideas</span>
               </button>
               <button
                 onClick={() => setShowMap(!showMap)}
@@ -199,17 +221,26 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
         <div className="grid grid-cols-3 border-t border-slate-800 bg-slate-950/70 divide-x divide-slate-800 text-center py-3">
           <div>
             <span className="text-xs text-slate-400 block">Total Days</span>
-            <strong className="text-base text-white">{trip.days.length} Days Planned</strong>
+            <strong className="text-base text-white">
+              {trip.days.length} Days Planned
+            </strong>
           </div>
           <div>
-            <span className="text-xs text-slate-400 block">Itinerary Spend</span>
-            <strong className="text-base text-emerald-400">${totalSpent}</strong>
-            <span className="text-xs text-slate-500 ml-1">/ ${trip.totalBudget}</span>
+            <span className="text-xs text-slate-400 block">
+              Itinerary Spend
+            </span>
+            <strong className="text-base text-emerald-400">
+              ${totalSpent}
+            </strong>
+            <span className="text-xs text-slate-500 ml-1">
+              / ${trip.totalBudget}
+            </span>
           </div>
           <div>
             <span className="text-xs text-slate-400 block">Planned Stops</span>
             <strong className="text-base text-cyan-400">
-              {trip.days.reduce((acc, d) => acc + d.activities.length, 0)} Activities
+              {trip.days.reduce((acc, d) => acc + d.activities.length, 0)}{' '}
+              Activities
             </strong>
           </div>
         </div>
@@ -221,7 +252,7 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
         <div className="lg:col-span-7 space-y-4">
           {/* Day Selector Pills */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-            {trip.days.map(d => (
+            {trip.days.map((d) => (
               <button
                 key={d.dayNumber}
                 onClick={() => setSelectedDayNum(d.dayNumber)}
@@ -251,7 +282,9 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
                   <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
                     Day {currentDay.dayNumber} Schedule
                   </span>
-                  <h3 className="text-lg font-bold text-white mt-0.5">{currentDay.theme}</h3>
+                  <h3 className="text-lg font-bold text-white mt-0.5">
+                    {currentDay.theme}
+                  </h3>
                 </div>
                 <button
                   onClick={() => setShowAddActivityModal(true)}
@@ -266,7 +299,9 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
               <div className="space-y-3 pt-2">
                 {currentDay.activities.length === 0 ? (
                   <div className="text-center py-10 border border-dashed border-slate-800 rounded-2xl">
-                    <p className="text-sm text-slate-400 mb-2">No activities scheduled for this day yet.</p>
+                    <p className="text-sm text-slate-400 mb-2">
+                      No activities scheduled for this day yet.
+                    </p>
                     <button
                       onClick={() => setShowAddActivityModal(true)}
                       className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-cyan-400 transition"
@@ -289,9 +324,20 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
                     >
                       {/* Checkbox button */}
                       <button
-                        onClick={() => handleToggleComplete(currentDay.dayNumber, activity.id)}
+                        aria-label={`${activity.isCompleted ? 'Mark incomplete' : 'Mark complete'}: ${activity.title}`}
+                        aria-pressed={!!activity.isCompleted}
+                        onClick={() =>
+                          handleToggleComplete(
+                            currentDay.dayNumber,
+                            activity.id
+                          )
+                        }
                         className="mt-0.5 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
-                        title={activity.isCompleted ? 'Mark incomplete' : 'Mark completed'}
+                        title={
+                          activity.isCompleted
+                            ? 'Mark incomplete'
+                            : 'Mark completed'
+                        }
                       >
                         {activity.isCompleted ? (
                           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -317,14 +363,18 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
                         </div>
                         <h4
                           className={`text-sm font-bold text-white mt-1 ${
-                            activity.isCompleted ? 'line-through text-slate-400' : ''
+                            activity.isCompleted
+                              ? 'line-through text-slate-400'
+                              : ''
                           }`}
                         >
                           {activity.title}
                         </h4>
                         <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                           <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                          <span className="truncate">{activity.locationName}</span>
+                          <span className="truncate">
+                            {activity.locationName}
+                          </span>
                         </div>
                         {activity.notes && (
                           <p className="text-xs text-slate-400 italic mt-1 bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
@@ -341,8 +391,13 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
                           </div>
                         )}
                         <button
-                          onClick={() => handleDeleteActivity(currentDay.dayNumber, activity.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-rose-400 transition mt-2 cursor-pointer"
+                          onClick={() =>
+                            handleDeleteActivity(
+                              currentDay.dayNumber,
+                              activity.id
+                            )
+                          }
+                          className="p-1 text-slate-500 hover:text-rose-400 transition mt-2 cursor-pointer"
                           title="Delete activity"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -363,7 +418,7 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 font-extrabold text-[11px] border border-cyan-500/30 flex items-center gap-1.5">
                 <Compass className="w-3.5 h-3.5 text-cyan-400" />
-                <span>High-Resolution 2D Itinerary Map</span>
+                <span>Your day on the map</span>
               </span>
             </div>
 
@@ -377,25 +432,46 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
 
           {showMap ? (
             <div className="sticky top-20 h-[520px]">
-              <HighRes2DRouteMap
-                destCoords={{
-                  lat: currentDay?.activities[0]?.lat || 35.6762,
-                  lng: currentDay?.activities[0]?.lng || 139.6503,
-                }}
-                destName={trip.destination}
-                points={(currentDay?.activities || []).map((a, idx) => ({
-                  id: a.id,
-                  title: a.title,
-                  lat: a.lat,
-                  lng: a.lng,
-                  category: a.category,
-                  time: a.time,
-                  cost: a.cost,
-                  description: a.notes,
-                }))}
-                className="h-full"
-                defaultLayer="voyager"
-              />
+              {!currentDay?.activities.some(
+                (a) => Number.isFinite(a.lat) && Number.isFinite(a.lng)
+              ) ? (
+                <div className="empty-state">
+                  <MapPin size={24} />
+                  <h3>No mapped stops yet</h3>
+                  <p>
+                    Your stops are saved. Only places with known coordinates
+                    appear on the map.
+                  </p>
+                </div>
+              ) : (
+                <HighRes2DRouteMap
+                  destCoords={{
+                    lat:
+                      currentDay?.activities.find((a) => Number.isFinite(a.lat))
+                        ?.lat ?? 20,
+                    lng:
+                      currentDay?.activities.find((a) => Number.isFinite(a.lng))
+                        ?.lng ?? 0,
+                  }}
+                  destName={trip.destination}
+                  points={(currentDay?.activities || [])
+                    .filter(
+                      (a) => Number.isFinite(a.lat) && Number.isFinite(a.lng)
+                    )
+                    .map((a, idx) => ({
+                      id: a.id,
+                      title: a.title,
+                      lat: a.lat,
+                      lng: a.lng,
+                      category: a.category,
+                      time: a.time,
+                      cost: a.cost,
+                      description: a.notes,
+                    }))}
+                  className="h-full"
+                  defaultLayer="voyager"
+                />
+              )}
             </div>
           ) : (
             <div className="p-8 rounded-3xl border border-dashed border-slate-800 bg-slate-900/30 text-center flex flex-col items-center justify-center h-64">
@@ -415,36 +491,60 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
       {/* Add Activity Modal */}
       {showAddActivityModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl space-y-4">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add activity"
+            className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl space-y-4"
+          >
             <h3 className="text-lg font-bold text-white">Add Itinerary Stop</h3>
             <form onSubmit={handleAddActivity} className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Activity Title *</label>
+                <label
+                  htmlFor="tripplannerview-field-1"
+                  className="text-xs font-bold text-slate-300 block mb-1"
+                >
+                  Activity Title *
+                </label>
                 <input
+                  id="tripplannerview-field-1"
                   type="text"
                   required
                   placeholder="e.g. Traditional Tea Ceremony in Uji"
                   value={newTitle}
-                  onChange={e => setNewTitle(e.target.value)}
+                  onChange={(e) => setNewTitle(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Time</label>
+                  <label
+                    htmlFor="tripplannerview-field-2"
+                    className="text-xs font-bold text-slate-300 block mb-1"
+                  >
+                    Time
+                  </label>
                   <input
+                    id="tripplannerview-field-2"
                     type="time"
                     value={newTime}
-                    onChange={e => setNewTime(e.target.value)}
+                    onChange={(e) => setNewTime(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Category</label>
+                  <label
+                    htmlFor="tripplannerview-field-3"
+                    className="text-xs font-bold text-slate-300 block mb-1"
+                  >
+                    Category
+                  </label>
                   <select
+                    id="tripplannerview-field-3"
                     value={newCategory}
-                    onChange={e => setNewCategory(e.target.value as any)}
+                    onChange={(e) => setNewCategory(e.target.value as any)}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-500"
                   >
                     <option value="sightseeing">Sightseeing</option>
@@ -458,34 +558,54 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Location Name</label>
+                  <label
+                    htmlFor="tripplannerview-field-4"
+                    className="text-xs font-bold text-slate-300 block mb-1"
+                  >
+                    Location Name
+                  </label>
                   <input
+                    id="tripplannerview-field-4"
                     type="text"
                     placeholder="e.g. Uji Byodoin Temple"
                     value={newLocation}
-                    onChange={e => setNewLocation(e.target.value)}
+                    onChange={(e) => setNewLocation(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Cost ($ USD)</label>
+                  <label
+                    htmlFor="tripplannerview-field-5"
+                    className="text-xs font-bold text-slate-300 block mb-1"
+                  >
+                    Cost ($ USD)
+                  </label>
                   <input
+                    id="tripplannerview-field-5"
                     type="number"
+                    min="0"
+                    step="0.01"
                     placeholder="0"
                     value={newCost}
-                    onChange={e => setNewCost(e.target.value)}
+                    onChange={(e) => setNewCost(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Notes / Booking Ref</label>
+                <label
+                  htmlFor="tripplannerview-field-6"
+                  className="text-xs font-bold text-slate-300 block mb-1"
+                >
+                  Notes / Booking Ref
+                </label>
                 <textarea
+                  id="tripplannerview-field-6"
                   rows={2}
                   placeholder="Ticket numbers, dress code, confirmation code..."
                   value={newNotes}
-                  onChange={e => setNewNotes(e.target.value)}
+                  onChange={(e) => setNewNotes(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-500"
                 />
               </div>

@@ -1,3 +1,5 @@
+import { isGeneratedTripPlan } from '../utils/validation';
+import { useDialog } from '../hooks/useDialog';
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -23,7 +25,7 @@ import {
   Navigation,
   ChevronDown,
   ChevronUp,
-  X
+  X,
 } from 'lucide-react';
 import { GeneratedTripPlan, PlaceItem } from '../types';
 import { HighRes2DRouteMap } from './HighRes2DRouteMap';
@@ -38,75 +40,153 @@ interface RouteItineraryGeneratorProps {
 }
 
 const POPULAR_ROUTES = [
-  { origin: 'New Delhi, India', destination: 'Tokyo, Japan', days: 7, vibe: 'Culture & Gastronomy' },
-  { origin: 'Mumbai, India', destination: 'Bali, Indonesia', days: 5, vibe: 'Tropical & Wellness' },
-  { origin: 'Bengaluru, India', destination: 'Manali, Himachal Pradesh', days: 4, vibe: 'Alpine Trekking & Nature' },
-  { origin: 'New York, USA', destination: 'Paris, France', days: 6, vibe: 'Romance & Architecture' },
-  { origin: 'London, UK', destination: 'Reykjavík, Iceland', days: 5, vibe: 'Aurora & Hot Springs' },
+  {
+    origin: 'New Delhi, India',
+    destination: 'Tokyo, Japan',
+    days: 7,
+    vibe: 'Culture & Gastronomy',
+  },
+  {
+    origin: 'Mumbai, India',
+    destination: 'Bali, Indonesia',
+    days: 5,
+    vibe: 'Tropical & Wellness',
+  },
+  {
+    origin: 'Bengaluru, India',
+    destination: 'Manali, Himachal Pradesh',
+    days: 4,
+    vibe: 'Alpine Trekking & Nature',
+  },
+  {
+    origin: 'New York, USA',
+    destination: 'Paris, France',
+    days: 6,
+    vibe: 'Romance & Architecture',
+  },
+  {
+    origin: 'London, UK',
+    destination: 'Reykjavík, Iceland',
+    days: 5,
+    vibe: 'Aurora & Hot Springs',
+  },
 ];
 
-export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = ({
+export const RouteItineraryGenerator: React.FC<
+  RouteItineraryGeneratorProps
+> = ({
   isOpen,
   onClose,
   onImportTrip,
   defaultOrigin = '',
   defaultDestination = '',
 }) => {
+  const requestRef = React.useRef<AbortController | null>(null);
+  React.useEffect(() => {
+    if (!isOpen) {
+      requestRef.current?.abort();
+      setIsLoading(false);
+    }
+    return () => requestRef.current?.abort();
+  }, [isOpen]);
   // Form State - blank by default so user can type any city, town, or monument
   const [origin, setOrigin] = useState(defaultOrigin);
+  const dialogRef = useDialog(isOpen, onClose);
   const [destination, setDestination] = useState(defaultDestination);
   const [originPlace, setOriginPlace] = useState<PlaceItem | null>(null);
-  const [destinationPlace, setDestinationPlace] = useState<PlaceItem | null>(null);
+  const [destinationPlace, setDestinationPlace] = useState<PlaceItem | null>(
+    null
+  );
   const [days, setDays] = useState(5);
   const [travelers, setTravelers] = useState(2);
-  const [groupType, setGroupType] = useState<'Solo' | 'Couple' | 'Family' | 'Friends'>('Couple');
-  const [budgetTier, setBudgetTier] = useState<'Budget' | 'Moderate' | 'Luxury'>('Moderate');
+  const [groupType, setGroupType] = useState<
+    'Solo' | 'Couple' | 'Family' | 'Friends'
+  >('Couple');
+  const [budgetTier, setBudgetTier] = useState<
+    'Budget' | 'Moderate' | 'Luxury'
+  >('Moderate');
   const [vibe, setVibe] = useState('Culture & Gastronomy');
 
-  // Sync when defaults change
-  React.useEffect(() => {
-    if (defaultOrigin) setOrigin(defaultOrigin);
-    if (defaultDestination) setDestination(defaultDestination);
-  }, [defaultOrigin, defaultDestination]);
-
   // Loading & Results State
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
-  const [generatedPlan, setGeneratedPlan] = useState<GeneratedTripPlan | null>(null);
-  const [activeTab, setActiveTab] = useState<'itinerary' | 'hotels' | 'food' | 'route' | 'budget'>('itinerary');
-  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'hi' | 'es' | 'fr'>('en');
+  const [generatedPlan, setGeneratedPlan] = useState<GeneratedTripPlan | null>(
+    null
+  );
+  const [activeTab, setActiveTab] = useState<
+    'itinerary' | 'hotels' | 'food' | 'route' | 'budget'
+  >('itinerary');
+  const [selectedLanguage, setSelectedLanguage] = useState<
+    'en' | 'hi' | 'es' | 'fr'
+  >('en');
   const [expandedDay, setExpandedDay] = useState<number>(1);
   const [selectedMapPoint, setSelectedMapPoint] = useState<any>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setOrigin(defaultOrigin);
+      setDestination(defaultDestination);
+      setOriginPlace(null);
+      setDestinationPlace(null);
+      setGeneratedPlan(null);
+      setError('');
+      setNotice('');
+      setSelectedLanguage('en');
+      setActiveTab('itinerary');
+    }
+  }, [isOpen, defaultOrigin, defaultDestination]);
+
   const loadingSteps = [
-    'Tracing flight trajectory & route distances...',
-    'Querying seasonal weather forecast & packing advice...',
-    'Synthesizing day-by-day scheduling with optimal timings...',
-    'Curating top boutique hotels & local culinary staples...',
-    'Generating high-resolution 2D route map & itinerary matrix...',
+    'Finding your starting point…',
+    'Thinking through your travel preferences…',
+    'Making room for the good stuff…',
+    'Putting together places to explore…',
+    'Adding the finishing touches…',
   ];
 
   const handleGenerate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!destination.trim()) return;
+    if (!destination.trim()) {
+      setError('Where would you like to go? Add a destination first.');
+      return;
+    }
 
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setIsLoading(true);
+    setError('');
+    setNotice('');
+    setActiveTab('itinerary');
+    setExpandedDay(1);
     setLoadingStep(0);
     setGeneratedPlan(null);
 
     const stepTimer = setInterval(() => {
-      setLoadingStep(prev => (prev < loadingSteps.length - 1 ? prev + 1 : prev));
+      setLoadingStep((prev) =>
+        prev < loadingSteps.length - 1 ? prev + 1 : prev
+      );
     }, 800);
 
     try {
       const res = await fetch('/api/ai/plan', {
         method: 'POST',
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(40000),
+        ]),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           origin: origin.trim() || 'New Delhi, India',
-          originCoords: originPlace ? { lat: originPlace.lat, lng: originPlace.lng } : undefined,
+          originCoords: originPlace
+            ? { lat: originPlace.lat, lng: originPlace.lng }
+            : undefined,
           destination: destination.trim(),
-          destCoords: destinationPlace ? { lat: destinationPlace.lat, lng: destinationPlace.lng } : undefined,
+          destCoords: destinationPlace
+            ? { lat: destinationPlace.lat, lng: destinationPlace.lng }
+            : undefined,
           days,
           travelers,
           groupType,
@@ -116,20 +196,42 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
       });
 
       const data = await res.json();
+      if (controller.signal.aborted) return;
+      if (!res.ok || !data.success || !isGeneratedTripPlan(data.plan))
+        throw new Error(
+          data.error || 'We couldn’t create your trip. Please try again.'
+        );
+      setNotice(
+        data.source === 'sample'
+          ? data.notice
+          : 'AI suggestions — verify places, opening times, travel requirements and prices before booking.'
+      );
       clearInterval(stepTimer);
 
       if (data.success && data.plan) {
-        setGeneratedPlan(data.plan);
+        setGeneratedPlan({
+          ...data.plan,
+          planningNote:
+            data.source === 'sample'
+              ? data.notice
+              : 'AI suggestions — verify details before booking.',
+        });
       }
     } catch (err) {
-      console.error('Failed to generate trip:', err);
+      if (!controller.signal.aborted)
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Connection lost. Please try again.'
+        );
       clearInterval(stepTimer);
     } finally {
-      setIsLoading(false);
+      clearInterval(stepTimer);
+      if (!controller.signal.aborted) setIsLoading(false);
     }
   };
 
-  const handleSelectRouteChip = (route: typeof POPULAR_ROUTES[0]) => {
+  const handleSelectRouteChip = (route: (typeof POPULAR_ROUTES)[0]) => {
     setOrigin(route.origin);
     setDestination(route.destination);
     setOriginPlace(null);
@@ -141,12 +243,12 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
   const getPointsForMap = () => {
     if (!generatedPlan) return [];
     const pts: any[] = [];
-    generatedPlan.days.forEach(d => {
+    generatedPlan.days.forEach((d) => {
       d.activities.forEach((act, idx) => {
-        if (act.lat && act.lng) {
+        if (Number.isFinite(act.lat) && Number.isFinite(act.lng)) {
           pts.push({
             id: `pt-${d.dayNumber}-${idx}`,
-            name: act.title,
+            title: act.title,
             lat: act.lat,
             lng: act.lng,
             category: act.category,
@@ -165,6 +267,10 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Plan your trip"
         initial={{ opacity: 0, scale: 0.96, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 15 }}
@@ -179,18 +285,22 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-black text-white tracking-tight">TripCheck AI Generator</h2>
+                <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
+                  TripCheck AI Generator
+                </h2>
                 <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-extrabold border border-cyan-500/30">
                   ORIGIN ➔ DESTINATION
                 </span>
               </div>
               <p className="text-xs text-slate-400 hidden sm:block">
-                Generate complete multi-day travel plans, transit routes, hotel picks & food guides
+                Generate complete multi-day travel plans, transit routes, hotel
+                picks & food guides
               </p>
             </div>
           </div>
 
           <button
+            aria-label="Close trip planner"
             onClick={onClose}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
           >
@@ -205,7 +315,7 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
             <div className="space-y-2">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-amber-400" />
-                <span>Trending Origin ➔ Destination Routes</span>
+                <span>A few ideas to get you started</span>
               </span>
               <div className="flex flex-wrap gap-2">
                 {POPULAR_ROUTES.map((route, i) => (
@@ -216,8 +326,12 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                   >
                     <span>{route.origin.split(',')[0]}</span>
                     <ArrowRight className="w-3 h-3 text-cyan-400" />
-                    <span className="font-bold text-cyan-400">{route.destination.split(',')[0]}</span>
-                    <span className="text-[10px] text-slate-400">({route.days}d)</span>
+                    <span className="font-bold text-cyan-400">
+                      {route.destination.split(',')[0]}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      ({route.days}d)
+                    </span>
                   </button>
                 ))}
               </div>
@@ -225,7 +339,10 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
           )}
 
           {/* Form Controls */}
-          <form onSubmit={handleGenerate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+          <form
+            onSubmit={handleGenerate}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-950/60 border border-slate-800"
+          >
             {/* Origin Autocomplete */}
             <div className="space-y-1.5">
               <PlaceAutocompleteInput
@@ -236,9 +353,9 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                 placeholder="Type any city, airport or town..."
                 onChange={(val, place) => {
                   setOrigin(val);
-                  if (place) setOriginPlace(place);
+                  setOriginPlace(place || null);
                 }}
-                onSelectPlace={place => {
+                onSelectPlace={(place) => {
                   setOriginPlace(place);
                 }}
               />
@@ -255,9 +372,9 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                 placeholder="Type any city, village or monument..."
                 onChange={(val, place) => {
                   setDestination(val);
-                  if (place) setDestinationPlace(place);
+                  setDestinationPlace(place || null);
                 }}
-                onSelectPlace={place => {
+                onSelectPlace={(place) => {
                   setDestinationPlace(place);
                 }}
               />
@@ -270,14 +387,17 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                   <Calendar className="w-3.5 h-3.5 text-amber-400" />
                   <span>Duration</span>
                 </span>
-                <span className="text-cyan-400 font-mono font-bold">{days} Days</span>
+                <span className="text-cyan-400 font-mono font-bold">
+                  {days} Days
+                </span>
               </label>
               <input
                 type="range"
                 min={2}
-                max={12}
+                max={14}
+                aria-label="Number of days"
                 value={days}
-                onChange={e => setDays(Number(e.target.value))}
+                onChange={(e) => setDays(Number(e.target.value))}
                 className="w-full accent-cyan-500 cursor-pointer"
               />
             </div>
@@ -289,8 +409,13 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                 <span>Companions</span>
               </label>
               <select
+                aria-label="Travel group"
                 value={groupType}
-                onChange={e => setGroupType(e.target.value as any)}
+                onChange={(e) => {
+                  setGroupType(e.target.value as any);
+                  if (e.target.value === 'Solo') setTravelers(1);
+                  else if (e.target.value === 'Couple') setTravelers(2);
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
               >
                 <option value="Solo">Solo Explorer</option>
@@ -300,6 +425,24 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
               </select>
             </div>
 
+            <div className="space-y-1.5">
+              <label
+                htmlFor="travelers-count"
+                className="text-xs font-bold text-slate-300"
+              >
+                Travelers
+              </label>
+              <input
+                id="travelers-count"
+                type="number"
+                min={1}
+                max={20}
+                required
+                value={travelers}
+                onChange={(e) => setTravelers(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm"
+              />
+            </div>
             {/* Budget & Vibe in second row */}
             <div className="space-y-1.5 sm:col-span-2">
               <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
@@ -307,7 +450,7 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                 <span>Budget Tier</span>
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {(['Budget', 'Moderate', 'Luxury'] as const).map(tier => (
+                {(['Budget', 'Moderate', 'Luxury'] as const).map((tier) => (
                   <button
                     type="button"
                     key={tier}
@@ -324,35 +467,61 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
               </div>
             </div>
 
-            <div className="space-y-1.5 sm:col-span-2 flex items-end gap-2">
+            <div className="space-y-1.5 sm:col-span-2 flex flex-wrap items-end gap-2">
               <div className="flex-1">
                 <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 mb-1.5">
                   <Compass className="w-3.5 h-3.5 text-indigo-400" />
                   <span>Travel Vibe</span>
                 </label>
                 <select
+                  aria-label="Travel style"
                   value={vibe}
-                  onChange={e => setVibe(e.target.value)}
+                  onChange={(e) => setVibe(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="Culture & Gastronomy">Culture & Culinary Delights</option>
-                  <option value="Adventure & Nature">High Adventure, Trekking & Wilderness</option>
-                  <option value="Tropical & Relaxation">Relaxed Beaches, Sunsets & Spas</option>
-                  <option value="Urban Nightlife & Cyberpunk">Electric Nightlife, Shopping & Architecture</option>
+                  <option value="Culture & Gastronomy">
+                    Culture & Culinary Delights
+                  </option>
+                  <option value="Adventure & Nature">
+                    High Adventure, Trekking & Wilderness
+                  </option>
+                  <option value="Tropical & Relaxation">
+                    Relaxed Beaches, Sunsets & Spas
+                  </option>
+                  <option value="Urban Nightlife & Cyberpunk">
+                    Electric Nightlife, Shopping & Architecture
+                  </option>
                 </select>
               </div>
-
+            </div>
+            <div className="sm:col-span-4 flex justify-end pt-3">
               <button
                 type="submit"
                 disabled={isLoading}
                 className="h-[38px] px-6 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs shadow-lg shadow-cyan-500/30 flex items-center gap-2 transition cursor-pointer whitespace-nowrap disabled:opacity-50"
               >
                 <Sparkles className="w-4 h-4 fill-slate-950" />
-                <span>{isLoading ? 'Synthesizing...' : 'Generate Trip'}</span>
+                <span>{isLoading ? 'Making your plan…' : 'Generate Trip'}</span>
               </button>
             </div>
           </form>
 
+          {error && (
+            <p
+              role="alert"
+              className="p-3 rounded-xl bg-rose-50 text-rose-700 text-sm"
+            >
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p
+              role="status"
+              className="p-3 rounded-xl bg-amber-50 text-amber-800 text-sm"
+            >
+              {notice}
+            </p>
+          )}
           {/* Loading Animation State */}
           <AnimatePresence>
             {isLoading && (
@@ -364,14 +533,22 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
               >
                 <div className="relative w-16 h-16 mx-auto">
                   <div className="absolute inset-0 rounded-full border-4 border-cyan-500/20 border-t-cyan-500 animate-spin" />
-                  <div className="absolute inset-2 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+                  <div
+                    className="absolute inset-2 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin"
+                    style={{
+                      animationDirection: 'reverse',
+                      animationDuration: '1.5s',
+                    }}
+                  />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <Navigation className="w-6 h-6 text-cyan-400 animate-pulse" />
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-base font-bold text-white">Synthesizing Your Master Trip</h3>
+                  <h3 className="text-base font-bold text-white">
+                    A little planning in progress…
+                  </h3>
                   <p className="text-xs text-cyan-400 font-mono mt-1 animate-pulse">
                     {loadingSteps[loadingStep]}
                   </p>
@@ -381,7 +558,9 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                   <motion.div
                     className="bg-gradient-to-r from-cyan-500 to-purple-500 h-full"
                     initial={{ width: '10%' }}
-                    animate={{ width: `${((loadingStep + 1) / loadingSteps.length) * 100}%` }}
+                    animate={{
+                      width: `${((loadingStep + 1) / loadingSteps.length) * 100}%`,
+                    }}
                     transition={{ duration: 0.5 }}
                   />
                 </div>
@@ -408,7 +587,9 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                         {generatedPlan.distanceKm.toLocaleString()} km
                       </span>
                     </div>
-                    <h3 className="text-xl sm:text-2xl font-black text-white">{generatedPlan.title}</h3>
+                    <h3 className="text-xl sm:text-2xl font-black text-white">
+                      {generatedPlan.title}
+                    </h3>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -425,7 +606,8 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl">
                   {selectedLanguage === 'en'
                     ? generatedPlan.summary
-                    : generatedPlan.translations[selectedLanguage]?.summary || generatedPlan.summary}
+                    : generatedPlan.translations[selectedLanguage]?.summary ||
+                      generatedPlan.summary}
                 </p>
 
                 {/* Translation & Weather Badges */}
@@ -433,17 +615,32 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                   {/* Weather forecast */}
                   <div className="flex items-center gap-2 text-xs text-slate-300">
                     <CloudSun className="w-4 h-4 text-amber-400" />
-                    <span className="font-bold text-white">{generatedPlan.weatherForecast.avgTempC}°C</span>
-                    <span className="text-slate-400">({generatedPlan.weatherForecast.condition})</span>
-                    <span className="hidden md:inline text-slate-500">• {generatedPlan.weatherForecast.packingTip}</span>
+                    <span className="font-bold text-white">
+                      {generatedPlan.weatherForecast.avgTempC}°C
+                    </span>
+                    <span className="text-slate-400">
+                      ({generatedPlan.weatherForecast.condition})
+                    </span>
+                    <span className="hidden md:inline text-slate-500">
+                      • {generatedPlan.weatherForecast.packingTip}
+                    </span>
                   </div>
 
                   {/* Multi-language selector */}
                   <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-800/90 border border-slate-700">
                     <Languages className="w-3.5 h-3.5 text-cyan-400 ml-1.5" />
-                    {(['en', 'hi', 'es', 'fr'] as const).map(lang => (
+                    {(['en', 'hi', 'es', 'fr'] as const).map((lang) => (
                       <button
                         key={lang}
+                        aria-label={
+                          {
+                            en: 'English',
+                            hi: 'Hindi',
+                            es: 'Spanish',
+                            fr: 'French',
+                          }[lang]
+                        }
+                        aria-pressed={selectedLanguage === lang}
                         onClick={() => setSelectedLanguage(lang)}
                         className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition cursor-pointer ${
                           selectedLanguage === lang
@@ -463,9 +660,11 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
                     <Navigation className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>High-Resolution 2D Flight & Waypoints Route</span>
+                    <span>Your route, at a glance</span>
                   </h4>
-                  <span className="text-[11px] text-slate-400">Click pins to inspect coordinates</span>
+                  <span className="text-[11px] text-slate-400">
+                    Schematic route, not turn-by-turn directions
+                  </span>
                 </div>
 
                 <HighRes2DRouteMap
@@ -475,7 +674,7 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                   destName={generatedPlan.destination}
                   points={getPointsForMap()}
                   selectedPointId={selectedMapPoint?.id}
-                  onSelectPoint={pt => setSelectedMapPoint(pt)}
+                  onSelectPoint={(pt) => setSelectedMapPoint(pt)}
                   className="h-[380px]"
                 />
               </div>
@@ -484,12 +683,32 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
                   {[
-                    { id: 'itinerary', label: 'Day-by-Day Plan', icon: <Calendar className="w-3.5 h-3.5" /> },
-                    { id: 'route', label: 'Transit & Route', icon: <Plane className="w-3.5 h-3.5" /> },
-                    { id: 'hotels', label: 'Curated Stays', icon: <Hotel className="w-3.5 h-3.5" /> },
-                    { id: 'food', label: 'Culinary Guide', icon: <Utensils className="w-3.5 h-3.5" /> },
-                    { id: 'budget', label: 'Budget Breakdown', icon: <Wallet className="w-3.5 h-3.5" /> },
-                  ].map(tab => (
+                    {
+                      id: 'itinerary',
+                      label: 'Day-by-Day Plan',
+                      icon: <Calendar className="w-3.5 h-3.5" />,
+                    },
+                    {
+                      id: 'route',
+                      label: 'Transit & Route',
+                      icon: <Plane className="w-3.5 h-3.5" />,
+                    },
+                    {
+                      id: 'hotels',
+                      label: 'Curated Stays',
+                      icon: <Hotel className="w-3.5 h-3.5" />,
+                    },
+                    {
+                      id: 'food',
+                      label: 'Culinary Guide',
+                      icon: <Utensils className="w-3.5 h-3.5" />,
+                    },
+                    {
+                      id: 'budget',
+                      label: 'Budget Breakdown',
+                      icon: <Wallet className="w-3.5 h-3.5" />,
+                    },
+                  ].map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as any)}
@@ -508,7 +727,7 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                 {/* Tab 1: Day-by-day Itinerary Accordions */}
                 {activeTab === 'itinerary' && (
                   <div className="space-y-3">
-                    {generatedPlan.days.map(d => {
+                    {generatedPlan.days.map((d) => {
                       const isExpanded = expandedDay === d.dayNumber;
                       return (
                         <div
@@ -516,7 +735,9 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                           className="rounded-2xl bg-slate-950/60 border border-slate-800 overflow-hidden"
                         >
                           <div
-                            onClick={() => setExpandedDay(isExpanded ? 0 : d.dayNumber)}
+                            onClick={() =>
+                              setExpandedDay(isExpanded ? 0 : d.dayNumber)
+                            }
                             className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-850/50 transition"
                           >
                             <div className="flex items-center gap-3">
@@ -524,12 +745,20 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                                 D{d.dayNumber}
                               </span>
                               <div>
-                                <h4 className="text-sm font-bold text-white">{d.theme}</h4>
-                                <span className="text-[11px] text-slate-400">{d.activities.length} planned experiences</span>
+                                <h4 className="text-sm font-bold text-white">
+                                  {d.theme}
+                                </h4>
+                                <span className="text-[11px] text-slate-400">
+                                  {d.activities.length} planned experiences
+                                </span>
                               </div>
                             </div>
 
-                            {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-slate-400" />
+                            )}
                           </div>
 
                           {isExpanded && (
@@ -540,11 +769,19 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                                   className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                                 >
                                   <div className="flex items-start gap-3">
-                                    <span className="text-xs font-mono font-bold text-cyan-400 mt-0.5">{act.time}</span>
+                                    <span className="text-xs font-mono font-bold text-cyan-400 mt-0.5">
+                                      {act.time}
+                                    </span>
                                     <div>
-                                      <h5 className="text-xs font-bold text-white">{act.title}</h5>
-                                      <p className="text-[11px] text-slate-400">{act.description}</p>
-                                      <span className="text-[10px] text-slate-500">📍 {act.location}</span>
+                                      <h5 className="text-xs font-bold text-white">
+                                        {act.title}
+                                      </h5>
+                                      <p className="text-[11px] text-slate-400">
+                                        {act.description}
+                                      </p>
+                                      <span className="text-[10px] text-slate-500">
+                                        📍 {act.location}
+                                      </span>
                                     </div>
                                   </div>
                                   <span className="text-xs font-mono font-bold text-emerald-400 self-end sm:self-center">
@@ -567,7 +804,9 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                       <div
                         key={i}
                         className={`p-4 rounded-2xl bg-slate-950/60 border ${
-                          opt.isRecommended ? 'border-cyan-500/60 ring-1 ring-cyan-500/40' : 'border-slate-800'
+                          opt.isRecommended
+                            ? 'border-cyan-500/60 ring-1 ring-cyan-500/40'
+                            : 'border-slate-800'
                         } space-y-3 relative`}
                       >
                         {opt.isRecommended && (
@@ -577,15 +816,25 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                         )}
 
                         <div className="flex items-center gap-2 text-cyan-400">
-                          {opt.mode === 'flight' && <Plane className="w-5 h-5" />}
-                          {opt.mode === 'train' && <Train className="w-5 h-5" />}
+                          {opt.mode === 'flight' && (
+                            <Plane className="w-5 h-5" />
+                          )}
+                          {opt.mode === 'train' && (
+                            <Train className="w-5 h-5" />
+                          )}
                           {opt.mode === 'car' && <Car className="w-5 h-5" />}
-                          <h4 className="text-sm font-bold text-white">{opt.title}</h4>
+                          <h4 className="text-sm font-bold text-white">
+                            {opt.title}
+                          </h4>
                         </div>
 
                         <div className="flex items-baseline justify-between">
-                          <span className="text-xs text-slate-400">{opt.duration}</span>
-                          <span className="text-base font-black text-emerald-400 font-mono">~${opt.estimatedCost}</span>
+                          <span className="text-xs text-slate-400">
+                            {opt.duration}
+                          </span>
+                          <span className="text-base font-black text-emerald-400 font-mono">
+                            ~${opt.estimatedCost}
+                          </span>
                         </div>
 
                         <p className="text-xs text-slate-400">{opt.details}</p>
@@ -613,22 +862,33 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                               <span className="px-2 py-0.5 rounded-md bg-slate-800 text-cyan-400 text-[10px] font-bold">
                                 {hotel.tier}
                               </span>
-                              <span className="text-xs text-amber-400 font-bold">★ {hotel.rating}</span>
+                              <span className="text-xs text-amber-400 font-bold">
+                                ★ {hotel.rating}
+                              </span>
                             </div>
-                            <h4 className="text-sm font-bold text-white mt-1.5">{hotel.name}</h4>
-                            <p className="text-[11px] text-slate-400">{hotel.location}</p>
+                            <h4 className="text-sm font-bold text-white mt-1.5">
+                              {hotel.name}
+                            </h4>
+                            <p className="text-[11px] text-slate-400">
+                              {hotel.location}
+                            </p>
                           </div>
 
                           <div className="space-y-1">
                             {hotel.perks.map((p, idx) => (
-                              <span key={idx} className="block text-[10px] text-slate-400">
+                              <span
+                                key={idx}
+                                className="block text-[10px] text-slate-400"
+                              >
                                 • {p}
                               </span>
                             ))}
                           </div>
 
                           <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                            <span className="text-[11px] text-slate-500">Per Night</span>
+                            <span className="text-[11px] text-slate-500">
+                              Per Night
+                            </span>
                             <span className="text-sm font-black text-emerald-400 font-mono">
                               ${hotel.pricePerNight}
                             </span>
@@ -651,11 +911,19 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                           <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-400 text-[10px] font-bold">
                             {food.dishType}
                           </span>
-                          <span className="text-[11px] font-mono text-emerald-400 font-bold">{food.priceRange}</span>
+                          <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                            {food.priceRange}
+                          </span>
                         </div>
-                        <h4 className="text-sm font-bold text-white">{food.dishName}</h4>
-                        <p className="text-xs text-slate-400 leading-relaxed">{food.description}</p>
-                        <p className="text-[11px] text-cyan-400 font-medium">📍 Recommended: {food.recommendedSpot}</p>
+                        <h4 className="text-sm font-bold text-white">
+                          {food.dishName}
+                        </h4>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          {food.description}
+                        </p>
+                        <p className="text-[11px] text-cyan-400 font-medium">
+                          📍 Recommended: {food.recommendedSpot}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -665,33 +933,44 @@ export const RouteItineraryGenerator: React.FC<RouteItineraryGeneratorProps> = (
                 {activeTab === 'budget' && (
                   <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-white">Estimated Spend Matrix</h4>
+                      <h4 className="text-sm font-bold text-white">
+                        Estimated Spend Matrix
+                      </h4>
                       <span className="text-base font-black text-emerald-400 font-mono">
-                        ${generatedPlan.budgetBreakdown.totalPerPerson} / traveler
+                        ${generatedPlan.budgetBreakdown.totalPerPerson} /
+                        traveler
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                        <span className="text-[10px] text-slate-400">Transit / Flights</span>
+                        <span className="text-[10px] text-slate-400">
+                          Transit / Flights
+                        </span>
                         <h5 className="text-sm font-bold text-white font-mono mt-0.5">
                           ${generatedPlan.budgetBreakdown.transport}
                         </h5>
                       </div>
                       <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                        <span className="text-[10px] text-slate-400">Lodging & Stays</span>
+                        <span className="text-[10px] text-slate-400">
+                          Lodging & Stays
+                        </span>
                         <h5 className="text-sm font-bold text-white font-mono mt-0.5">
                           ${generatedPlan.budgetBreakdown.accommodation}
                         </h5>
                       </div>
                       <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                        <span className="text-[10px] text-slate-400">Dining & Street Food</span>
+                        <span className="text-[10px] text-slate-400">
+                          Dining & Street Food
+                        </span>
                         <h5 className="text-sm font-bold text-white font-mono mt-0.5">
                           ${generatedPlan.budgetBreakdown.food}
                         </h5>
                       </div>
                       <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                        <span className="text-[10px] text-slate-400">Experiences & Sightseeing</span>
+                        <span className="text-[10px] text-slate-400">
+                          Experiences & Sightseeing
+                        </span>
                         <h5 className="text-sm font-bold text-white font-mono mt-0.5">
                           ${generatedPlan.budgetBreakdown.activities}
                         </h5>

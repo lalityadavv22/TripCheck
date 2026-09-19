@@ -1,3 +1,5 @@
+> **Current checkout:** the runnable app here is the React + Express TripCheck planner in `src/` and `server.ts`. Start with `npm ci && npm run dev` (Node 22+). See [verification and current limitations](docs/TESTING.md) for the tested features and commands. The upstream TREK documentation below describes a broader product; it is not a feature guarantee for this checkout.
+
 <div align="center">
 
 <picture>

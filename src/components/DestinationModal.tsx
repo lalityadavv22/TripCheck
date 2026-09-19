@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useDialog } from '../hooks/useDialog';
+import React, { useState, useEffect } from 'react';
 import { Destination } from '../types';
 import {
   X,
@@ -12,7 +13,7 @@ import {
   CheckCircle2,
   Share2,
   Compass,
-  ArrowRight
+  ArrowRight,
 } from 'lucide-react';
 
 interface DestinationModalProps {
@@ -28,15 +29,34 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
   onPlanTrip,
   onGenerateAI,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'logistics' | 'highlights'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'logistics' | 'highlights'
+  >('overview');
+  const dialogRef = useDialog(!!destination, onClose);
 
+  const [shareMessage, setShareMessage] = useState('');
+  useEffect(() => {
+    setActiveTab('overview');
+    setShareMessage('');
+  }, [destination?.id]);
   if (!destination) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl rounded-3xl bg-slate-900 border border-slate-700/80 shadow-2xl overflow-hidden my-8 animate-in zoom-in-95 duration-200">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Destination details"
+        className="relative w-full max-w-4xl rounded-3xl bg-slate-900 border border-slate-700/80 shadow-2xl overflow-hidden my-8 animate-in zoom-in-95 duration-200"
+      >
+        {shareMessage && (
+          <p role="status" className="p-3 text-sm break-all">
+            {shareMessage}
+          </p>
+        )}
         {/* Hero Banner Header */}
-        <div className="relative h-72 sm:h-96 w-full overflow-hidden">
+        <div className="relative h-96 sm:h-96 w-full overflow-hidden">
           <img
             src={destination.heroImage}
             alt={destination.name}
@@ -47,9 +67,18 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
           {/* Top control bar */}
           <div className="absolute top-5 right-5 flex items-center gap-3">
             <button
-              onClick={() => {
-                navigator.clipboard?.writeText(window.location.href);
-                alert('Trip link copied to clipboard!');
+              onClick={async () => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('destination', destination.id);
+                try {
+                  await navigator.clipboard.writeText(url.toString());
+                  setShareMessage('Destination link copied.');
+                } catch {
+                  setShareMessage(
+                    'Couldn’t copy automatically. Your destination link: ' +
+                      url.toString()
+                  );
+                }
               }}
               className="p-2.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white backdrop-blur-md border border-slate-700 transition"
               title="Share"
@@ -68,22 +97,26 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
           {/* Hero text overlay */}
           <div className="absolute bottom-6 left-6 right-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
                 <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold uppercase tracking-wider">
                   {destination.category}
                 </span>
                 <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold">
                   <Star className="w-3.5 h-3.5 fill-amber-300" />
-                  {destination.rating} ({destination.reviewsCount})
+                  Travel inspiration
                 </span>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
-                  {destination.matchScore}% Match
+                  Our pick
                 </span>
               </div>
-              <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">{destination.name}</h2>
+              <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+                {destination.name}
+              </h2>
               <div className="flex items-center gap-2 text-slate-300 text-sm mt-1">
                 <MapPin className="w-4 h-4 text-cyan-400" />
-                <span>{destination.country} • {destination.region}</span>
+                <span>
+                  {destination.country} • {destination.region}
+                </span>
               </div>
             </div>
 
@@ -96,7 +129,7 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-500/25 transition cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>AI Architect</span>
+                <span>Trip ideas</span>
               </button>
               <button
                 onClick={() => {
@@ -161,7 +194,9 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
                     <DollarSign className="w-4 h-4" />
                     <span>Est. Daily Budget</span>
                   </div>
-                  <div className="text-2xl font-bold text-white">${destination.estimatedBudgetPerDay}</div>
+                  <div className="text-2xl font-bold text-white">
+                    ${destination.estimatedBudgetPerDay}
+                  </div>
                   <span className="text-xs text-slate-400">per traveler</span>
                 </div>
 
@@ -170,16 +205,22 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
                     <Calendar className="w-4 h-4" />
                     <span>Best Season</span>
                   </div>
-                  <div className="text-sm font-bold text-white leading-tight">{destination.bestSeason}</div>
+                  <div className="text-sm font-bold text-white leading-tight">
+                    {destination.bestSeason}
+                  </div>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-700/60">
                   <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold uppercase mb-1">
                     <Sun className="w-4 h-4" />
-                    <span>Live Weather</span>
+                    <span>Example weather</span>
                   </div>
-                  <div className="text-2xl font-bold text-white">{destination.weather.temp}°C</div>
-                  <span className="text-xs text-slate-400">{destination.weather.condition}</span>
+                  <div className="text-2xl font-bold text-white">
+                    {destination.weather.temp}°C
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    {destination.weather.condition}
+                  </span>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-700/60">
@@ -195,7 +236,9 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
 
               {/* Gallery snippet */}
               <div>
-                <h4 className="text-sm font-bold text-slate-200 mb-3 uppercase tracking-wider">Atmospheric Photo Gallery</h4>
+                <h4 className="text-sm font-bold text-slate-200 mb-3 uppercase tracking-wider">
+                  Atmospheric Photo Gallery
+                </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {destination.galleryImages.map((img, i) => (
                     <img
@@ -212,7 +255,9 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
 
           {activeTab === 'highlights' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-bold text-white">Must-Experience Signature Encounters</h3>
+              <h3 className="text-lg font-bold text-white">
+                Must-Experience Signature Encounters
+              </h3>
               <div className="grid gap-3">
                 {destination.highlights.map((highlight, index) => (
                   <div
@@ -222,7 +267,9 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
                     <div className="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm shrink-0">
                       {index + 1}
                     </div>
-                    <div className="text-sm font-semibold text-slate-200">{highlight}</div>
+                    <div className="text-sm font-semibold text-slate-200">
+                      {highlight}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -236,7 +283,9 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
                   <ShieldCheck className="w-4 h-4 text-cyan-400" />
                   <span>Entry & Border Regulations</span>
                 </h4>
-                <p className="text-sm text-slate-300">{destination.visaRequirement}</p>
+                <p className="text-sm text-slate-300">
+                  {destination.visaRequirement}
+                </p>
               </div>
 
               <div className="p-5 rounded-2xl bg-slate-800/50 border border-slate-700">
@@ -245,7 +294,10 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
                   <span>Currency & Estimated Daily Breakdown</span>
                 </h4>
                 <p className="text-sm text-slate-300">
-                  Official Currency: <strong>{destination.currency}</strong>. Estimated base expenses cover comfortable 4-star boutique hotel accommodations, 2 authentic dining experiences, regional transit passes, and tier-1 museum admissions.
+                  Local currency: <strong>{destination.currency}</strong>.
+                  Budgets are rough USD estimates. Weather and travel guidance
+                  are examples, not live data. Check official visa rules for
+                  your passport and current conditions before booking.
                 </p>
               </div>
             </div>

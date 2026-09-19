@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
@@ -10,8 +11,18 @@ import {
   Car,
   MapPin,
   Clock,
-  Sparkles
+  Sparkles,
 } from 'lucide-react';
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (char) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[
+        char
+      ]!
+  );
+}
 
 export interface MapPoint {
   id: string;
@@ -36,12 +47,13 @@ export interface HighRes2DRouteMapProps {
   className?: string;
   showLayerControls?: boolean;
   showStatsHeader?: boolean;
+  connectPoints?: boolean;
   defaultLayer?: 'satellite' | 'voyager' | 'dark' | 'osm';
 }
 
 const TILE_LAYERS = {
   satellite: {
-    name: 'High-Res Satellite',
+    name: 'Satellite',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: '© Esri, Maxar, Earthstar Geographics',
     maxZoom: 19,
@@ -53,7 +65,7 @@ const TILE_LAYERS = {
     maxZoom: 19,
   },
   dark: {
-    name: 'Cyber Dark',
+    name: 'Dark',
     url: 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
     attribution: '© CartoDB Dark Matter, © OpenStreetMap',
     maxZoom: 19,
@@ -83,7 +95,9 @@ function generateGeodesicArc(
     Math.asin(
       Math.sqrt(
         Math.pow(Math.sin((lat1 - lat2) / 2), 2) +
-          Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon1 - lon2) / 2), 2)
+          Math.cos(lat1) *
+            Math.cos(lat2) *
+            Math.pow(Math.sin((lon1 - lon2) / 2), 2)
       )
     );
 
@@ -97,8 +111,10 @@ function generateGeodesicArc(
     const A = Math.sin((1 - f) * d) / Math.sin(d);
     const B = Math.sin(f * d) / Math.sin(d);
 
-    const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
-    const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+    const x =
+      A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+    const y =
+      A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
     const z = A * Math.sin(lat1) + B * Math.sin(lat2);
 
     let lat = (Math.atan2(z, Math.sqrt(x * x + y * y)) * 180) / Math.PI;
@@ -114,7 +130,10 @@ function generateGeodesicArc(
   return points;
 }
 
-function calculateDistanceKm(c1: { lat: number; lng: number }, c2: { lat: number; lng: number }): number {
+function calculateDistanceKm(
+  c1: { lat: number; lng: number },
+  c2: { lat: number; lng: number }
+): number {
   const R = 6371;
   const dLat = ((c2.lat - c1.lat) * Math.PI) / 180;
   const dLng = ((c2.lng - c1.lng) * Math.PI) / 180;
@@ -139,18 +158,41 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
   className = 'h-[440px]',
   showLayerControls = true,
   showStatsHeader = true,
-  defaultLayer = 'satellite',
+  connectPoints = false,
+  defaultLayer = 'voyager',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const routeLayersRef = useRef<L.LayerGroup | null>(null);
-  const [activeLayer, setActiveLayer] = useState<'satellite' | 'voyager' | 'dark' | 'osm'>(defaultLayer);
+  const [activeLayer, setActiveLayer] = useState<
+    'satellite' | 'voyager' | 'dark' | 'osm'
+  >(defaultLayer);
+  const [tileError, setTileError] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const distanceKm = originCoords ? calculateDistanceKm(originCoords, destCoords) : 0;
+  const distanceKm = originCoords
+    ? calculateDistanceKm(originCoords, destCoords)
+    : 0;
   const distanceMiles = Math.round(distanceKm * 0.621371);
   const estFlightHours = Math.max(1, Math.round(distanceKm / 800));
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopImmediatePropagation();
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener('keydown', escape, true);
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener('keydown', escape, true);
+    };
+  }, [isFullscreen]);
 
   // Initialize Map
   useEffect(() => {
@@ -161,22 +203,20 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
         center: [destCoords.lat, destCoords.lng],
         zoom: originCoords ? 3 : 12,
         zoomControl: false,
-        attributionControl: false,
+        zoomAnimation: false,
+        fadeAnimation: false,
+        markerZoomAnimation: false,
+        attributionControl: true,
         scrollWheelZoom: true,
       });
 
       // Subtle zoom control at bottom right
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // Attribution
-      L.control
-        .attribution({ position: 'bottomleft', prefix: false })
-        .addAttribution(TILE_LAYERS[activeLayer].attribution)
-        .addTo(map);
-
       // Base tile layer
       tileLayerRef.current = L.tileLayer(TILE_LAYERS[activeLayer].url, {
         maxZoom: TILE_LAYERS[activeLayer].maxZoom,
+        attribution: TILE_LAYERS[activeLayer].attribution,
         subdomains: activeLayer === 'osm' ? 'abc' : 'abcd',
       }).addTo(map);
 
@@ -184,13 +224,17 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
       mapRef.current = map;
     }
 
+    const observer = new ResizeObserver(() => mapRef.current?.invalidateSize());
+    observer.observe(containerRef.current);
     return () => {
+      observer.disconnect();
       if (mapRef.current) {
+        mapRef.current.stop();
         mapRef.current.remove();
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [isFullscreen]);
 
   // Update base tile layer on change
   useEffect(() => {
@@ -203,11 +247,15 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
 
     const newLayer = L.tileLayer(TILE_LAYERS[activeLayer].url, {
       maxZoom: TILE_LAYERS[activeLayer].maxZoom,
+      attribution: TILE_LAYERS[activeLayer].attribution,
       subdomains: activeLayer === 'osm' ? 'abc' : 'abcd',
     }).addTo(map);
 
+    setTileError(false);
+    newLayer.on('tileerror', () => setTileError(true));
+    newLayer.on('tileload', () => setTileError(false));
     tileLayerRef.current = newLayer;
-  }, [activeLayer]);
+  }, [activeLayer, isFullscreen]);
 
   // Redraw routes, pins, arcs, waypoints whenever coordinates/points change
   useEffect(() => {
@@ -239,11 +287,13 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
         iconAnchor: [16, 16],
       });
 
-      const originMarker = L.marker([originCoords.lat, originCoords.lng], { icon: originIcon });
+      const originMarker = L.marker([originCoords.lat, originCoords.lng], {
+        icon: originIcon,
+      });
       originMarker.bindPopup(`
-        <div class="p-2 text-slate-900 font-sans min-w-[160px]">
+        <div class="p-2 text-slate-100 font-sans min-w-[160px]">
           <span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase mb-1">Departure Origin</span>
-          <h4 class="font-bold text-sm text-slate-900">${originName}</h4>
+          <h4 class="font-bold text-sm text-slate-100">${escapeHtml(originName)}</h4>
           <p class="text-xs text-slate-600 mt-1">GPS: ${originCoords.lat.toFixed(3)}, ${originCoords.lng.toFixed(3)}</p>
         </div>
       `);
@@ -306,11 +356,13 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
       iconAnchor: [18, 18],
     });
 
-    const destMarker = L.marker([destCoords.lat, destCoords.lng], { icon: destIcon });
+    const destMarker = L.marker([destCoords.lat, destCoords.lng], {
+      icon: destIcon,
+    });
     destMarker.bindPopup(`
-      <div class="p-2 text-slate-900 font-sans min-w-[170px]">
+      <div class="p-2 text-slate-100 font-sans min-w-[170px]">
         <span class="inline-block px-2 py-0.5 rounded bg-cyan-100 text-cyan-800 text-[10px] font-bold uppercase mb-1">Target Destination</span>
-        <h4 class="font-bold text-sm text-slate-900">${destName}</h4>
+        <h4 class="font-bold text-sm text-slate-100">${escapeHtml(destName)}</h4>
         <p class="text-xs text-slate-600 mt-1">Coordinates: ${destCoords.lat.toFixed(4)}°, ${destCoords.lng.toFixed(4)}°</p>
       </div>
     `);
@@ -320,23 +372,25 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
     if (points && points.length > 0) {
       const activityCoords: [number, number][] = [];
 
-      points.forEach((pt, index) => {
-        bounds.extend([pt.lat, pt.lng]);
-        activityCoords.push([pt.lat, pt.lng]);
+      points
+        .filter((pt) => Number.isFinite(pt.lat) && Number.isFinite(pt.lng))
+        .forEach((pt, index) => {
+          bounds.extend([pt.lat, pt.lng]);
+          activityCoords.push([pt.lat, pt.lng]);
 
-        const isSelected = selectedPointId === pt.id;
-        const color =
-          pt.category === 'food'
-            ? '#f97316'
-            : pt.category === 'lodging'
-            ? '#8b5cf6'
-            : pt.category === 'transit'
-            ? '#10b981'
-            : '#06b6d4';
+          const isSelected = selectedPointId === pt.id;
+          const color =
+            pt.category === 'food'
+              ? '#f97316'
+              : pt.category === 'lodging'
+                ? '#8b5cf6'
+                : pt.category === 'transit'
+                  ? '#10b981'
+                  : '#06b6d4';
 
-        const ptIcon = L.divIcon({
-          className: 'activity-pin',
-          html: `
+          const ptIcon = L.divIcon({
+            className: 'activity-pin',
+            html: `
             <div class="cursor-pointer transition-transform hover:scale-125" style="display: flex; align-items: center; justify-content: center;">
               <div style="
                 background: ${color};
@@ -356,33 +410,33 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
               </div>
             </div>
           `,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-        });
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+          });
 
-        const marker = L.marker([pt.lat, pt.lng], { icon: ptIcon });
-        marker.on('click', () => {
-          if (onSelectPoint) onSelectPoint(pt);
-        });
+          const marker = L.marker([pt.lat, pt.lng], { icon: ptIcon });
+          marker.on('click', () => {
+            if (onSelectPoint) onSelectPoint(pt);
+          });
 
-        marker.bindPopup(`
-          <div class="p-2 font-sans text-slate-900 min-w-[200px] max-w-[260px]">
-            ${pt.image ? `<img src="${pt.image}" class="w-full h-24 object-cover rounded-lg mb-2" />` : ''}
+          marker.bindPopup(`
+          <div class="p-2 font-sans text-slate-100 min-w-[200px] max-w-[260px]">
+            ${pt.image ? `<img src="${escapeHtml(pt.image)}" class="w-full h-24 object-cover rounded-lg mb-2" />` : ''}
             <div class="flex items-center justify-between gap-1 mb-1">
-              <span class="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded text-white" style="background: ${color};">${pt.category || 'Sightseeing'}</span>
-              ${pt.time ? `<span class="text-[11px] text-slate-500 font-medium">⏰ ${pt.time}</span>` : ''}
+              <span class="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded text-white" style="background: ${color};">${escapeHtml(pt.category || 'Sightseeing')}</span>
+              ${pt.time ? `<span class="text-[11px] text-slate-500 font-medium">⏰ ${escapeHtml(pt.time)}</span>` : ''}
             </div>
-            <h4 class="font-bold text-sm text-slate-950">${pt.title}</h4>
-            ${pt.description ? `<p class="text-xs text-slate-600 mt-1 leading-relaxed">${pt.description}</p>` : ''}
-            ${pt.cost !== undefined ? `<p class="text-xs font-bold text-cyan-600 mt-1.5">Est. Cost: $${pt.cost}</p>` : ''}
+            <h4 class="font-bold text-sm text-slate-100">${escapeHtml(pt.title)}</h4>
+            ${pt.description ? `<p class="text-xs text-slate-600 mt-1 leading-relaxed">${escapeHtml(pt.description)}</p>` : ''}
+            ${pt.cost !== undefined ? `<p class="text-xs font-bold text-cyan-600 mt-1.5">Est. Cost: $${escapeHtml(pt.cost)}</p>` : ''}
           </div>
         `);
 
-        routeGroup.addLayer(marker);
-      });
+          routeGroup.addLayer(marker);
+        });
 
       // Connect activities with a smooth walking/transit line
-      if (activityCoords.length > 1) {
+      if (connectPoints && activityCoords.length > 1) {
         const activityLine = L.polyline(activityCoords, {
           color: '#f59e0b',
           weight: 2.5,
@@ -398,10 +452,17 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
       map.fitBounds(bounds, {
         padding: [45, 45],
         maxZoom: points.length > 0 && !originCoords ? 13 : 8,
-        animate: true,
+        animate: false,
       });
     }
-  }, [originCoords, destCoords, points, selectedPointId]);
+  }, [
+    originCoords,
+    destCoords,
+    points,
+    selectedPointId,
+    isFullscreen,
+    connectPoints,
+  ]);
 
   const handleFitBounds = () => {
     const map = mapRef.current;
@@ -409,16 +470,18 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
     const bounds = L.latLngBounds([]);
     if (originCoords) bounds.extend([originCoords.lat, originCoords.lng]);
     bounds.extend([destCoords.lat, destCoords.lng]);
-    points.forEach(p => bounds.extend([p.lat, p.lng]));
+    points
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+      .forEach((p) => bounds.extend([p.lat, p.lng]));
     if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], animate: true });
+      map.fitBounds(bounds, { padding: [40, 40], animate: false });
     }
   };
 
-  return (
+  const content = (
     <div
       className={`relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl flex flex-col ${
-        isFullscreen ? 'fixed inset-4 z-50 h-[calc(100vh-32px)]' : className
+        isFullscreen ? 'map-fullscreen' : className
       }`}
     >
       {/* Route Stats Header Bar */}
@@ -428,9 +491,13 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
             {originCoords && (
               <div className="px-3 py-1.5 rounded-xl bg-slate-950/90 border border-slate-700/80 backdrop-blur-md shadow-lg flex items-center gap-2 text-xs text-white">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="font-bold text-emerald-400">{originName.split(',')[0]}</span>
+                <span className="font-bold text-emerald-400">
+                  {originName.split(',')[0]}
+                </span>
                 <span className="text-slate-500">➔</span>
-                <span className="font-bold text-cyan-400">{destName.split(',')[0]}</span>
+                <span className="font-bold text-cyan-400">
+                  {destName.split(',')[0]}
+                </span>
               </div>
             )}
 
@@ -438,17 +505,20 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
               <div className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 backdrop-blur-md shadow-lg flex items-center gap-2 text-[11px] text-slate-300">
                 <Navigation className="w-3 h-3 text-cyan-400" />
                 <span>
-                  <strong className="text-white font-extrabold">{distanceKm.toLocaleString()}</strong> km ({distanceMiles.toLocaleString()} mi)
+                  <strong className="text-white font-extrabold">
+                    {distanceKm.toLocaleString()}
+                  </strong>{' '}
+                  km ({distanceMiles.toLocaleString()} mi)
                 </span>
                 <span className="text-slate-500">•</span>
-                <span>~{estFlightHours}h transit</span>
+                <span>Straight-line distance</span>
               </div>
             )}
 
             {points.length > 0 && (
               <div className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 backdrop-blur-md shadow-lg flex items-center gap-1.5 text-[11px] text-amber-300 font-bold">
                 <MapPin className="w-3 h-3 text-amber-400" />
-                <span>{points.length} Waypoints</span>
+                <span>{points.length} places</span>
               </div>
             )}
           </div>
@@ -469,33 +539,50 @@ export const HighRes2DRouteMap: React.FC<HighRes2DRouteMapProps> = ({
               title={isFullscreen ? 'Exit Fullscreen' : 'Expand Fullscreen'}
               className="p-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 backdrop-blur-md transition shadow-md cursor-pointer"
             >
-              {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              {isFullscreen ? (
+                <Minimize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
             </button>
           </div>
         </div>
       )}
 
+      {tileError && (
+        <p
+          role="status"
+          className="absolute top-24 left-3 right-3 z-[400] rounded-lg bg-slate-900 p-3 text-xs text-slate-300 shadow-md"
+        >
+          Map tiles couldn’t load. Check your connection or try another layer.
+          Your places are still saved.
+        </p>
+      )}
       {/* Map Leaflet Canvas Container */}
       <div ref={containerRef} className="w-full h-full flex-1 z-0" />
 
       {/* Layer Switcher Pills at Bottom Left */}
       {showLayerControls && (
-        <div className="absolute bottom-3 left-3 z-[400] flex items-center gap-1 p-1 rounded-2xl bg-slate-950/90 border border-slate-800 backdrop-blur-md shadow-xl">
-          {(['satellite', 'voyager', 'dark', 'osm'] as const).map(layerKey => (
-            <button
-              key={layerKey}
-              onClick={() => setActiveLayer(layerKey)}
-              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
-                activeLayer === layerKey
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              {TILE_LAYERS[layerKey].name}
-            </button>
-          ))}
+        <div className="absolute bottom-6 left-3 z-[400] flex items-center gap-1 p-1 rounded-2xl bg-slate-950/90 border border-slate-800 backdrop-blur-md shadow-xl">
+          {(['satellite', 'voyager', 'dark', 'osm'] as const).map(
+            (layerKey) => (
+              <button
+                key={layerKey}
+                aria-pressed={activeLayer === layerKey}
+                onClick={() => setActiveLayer(layerKey)}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
+                  activeLayer === layerKey
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md font-black'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                {TILE_LAYERS[layerKey].name}
+              </button>
+            )
+          )}
         </div>
       )}
     </div>
   );
+  return isFullscreen ? createPortal(content, document.body) : content;
 };
