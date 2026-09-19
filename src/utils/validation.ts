@@ -91,7 +91,8 @@ export function isGeneratedTripPlan(plan: any): plan is GeneratedTripPlan {
       'totalPerPerson',
     ].every((key) => cost(plan.budgetBreakdown[key])) &&
     object(plan.weatherForecast) &&
-    number(plan.weatherForecast.avgTempC) &&
+    (plan.weatherForecast.avgTempC === null ||
+      number(plan.weatherForecast.avgTempC)) &&
     string(plan.weatherForecast.condition) &&
     string(plan.weatherForecast.packingTip) &&
     strings(plan.packingAdvice) &&

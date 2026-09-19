@@ -186,7 +186,8 @@ export interface GeneratedTripPlan {
   hotels: HotelRecommendation[];
   foodGuide: FoodRecommendation[];
   weatherForecast: {
-    avgTempC: number;
+    /** null when the model did not provide a forecast — never a made-up temperature. */
+    avgTempC: number | null;
     condition: string;
     packingTip: string;
     bestTimeToVisit: string;
