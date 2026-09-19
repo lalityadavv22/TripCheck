@@ -1,7 +1,16 @@
 import React, { useRef } from 'react';
 import { motion } from 'motion/react';
 import { Destination } from '../types';
-import { Star, ChevronLeft, ChevronRight, Play, Info, Sparkles, Plus, Flame } from 'lucide-react';
+import {
+  Star,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Info,
+  Sparkles,
+  Plus,
+  Flame,
+} from 'lucide-react';
 
 interface NetflixCarouselsProps {
   destinations: Destination[];
@@ -17,13 +26,30 @@ export const NetflixCarousels: React.FC<NetflixCarouselsProps> = ({
   const featured = destinations[0] || null;
 
   const categories = [
-    { title: '🔥 Top Trending Voyages', filter: (d: Destination) => d.matchScore >= 95 },
-    { title: '🏔️ Alpine & Glacial Escapes', filter: (d: Destination) => d.category === 'Alpine Escapes' || d.category === 'Nordic Wilderness' },
-    { title: '⚡ Cyberpunk & Neon Metropolises', filter: (d: Destination) => d.category === 'Neon Cyberpunk Cities' },
-    { title: '🌴 Tropical Sanctuaries', filter: (d: Destination) => d.category === 'Tropical Sanctuaries' || d.category === 'Trending' },
+    {
+      title: 'Places we’re dreaming of',
+      filter: (d: Destination) => d.matchScore >= 95,
+    },
+    {
+      title: 'A breath of fresh air',
+      filter: (d: Destination) =>
+        d.category === 'Alpine Escapes' || d.category === 'Nordic Wilderness',
+    },
+    {
+      title: 'Cities with a little spark',
+      filter: (d: Destination) => d.category === 'Neon Cyberpunk Cities',
+    },
+    {
+      title: 'Slow days, sunny places',
+      filter: (d: Destination) =>
+        d.category === 'Tropical Sanctuaries' || d.category === 'Trending',
+    },
   ];
 
-  const CarouselRow: React.FC<{ title: string; items: Destination[] }> = ({ title, items }) => {
+  const CarouselRow: React.FC<{ title: string; items: Destination[] }> = ({
+    title,
+    items,
+  }) => {
     const rowRef = useRef<HTMLDivElement>(null);
 
     const scroll = (direction: 'left' | 'right') => {
@@ -41,7 +67,7 @@ export const NetflixCarousels: React.FC<NetflixCarouselsProps> = ({
               {items.length} spots
             </span>
           </h3>
-          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition duration-200">
+          <div className="flex items-center gap-1.5 opacity-100 transition duration-200">
             <button
               onClick={() => scroll('left')}
               className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
@@ -71,6 +97,15 @@ export const NetflixCarousels: React.FC<NetflixCarouselsProps> = ({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: idx * 0.05 }}
               whileHover={{ scale: 1.03, y: -4 }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Explore ${dest.name}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectDestination(dest);
+                }
+              }}
               onClick={() => onSelectDestination(dest)}
               className="relative shrink-0 w-64 sm:w-80 group/card rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-cyan-500/60 transition-colors duration-300 cursor-pointer shadow-lg hover:shadow-cyan-500/20"
             >
@@ -84,20 +119,22 @@ export const NetflixCarousels: React.FC<NetflixCarouselsProps> = ({
 
                 {/* Match score pill */}
                 <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-md border border-emerald-500/40 text-[11px] font-bold text-emerald-400">
-                  {dest.matchScore}% Match
+                  A place to discover
                 </div>
 
                 {/* Rating badge */}
                 <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-md border border-slate-700 text-[11px] font-bold text-amber-300">
                   <Star className="w-3 h-3 fill-amber-300" />
-                  <span>{dest.rating}</span>
+                  <span>Our pick</span>
                 </div>
               </div>
 
               <div className="p-4">
                 <div className="flex items-center justify-between text-xs text-cyan-400 font-semibold uppercase mb-1">
                   <span>{dest.country}</span>
-                  <span className="text-slate-400 font-normal">${dest.estimatedBudgetPerDay}/day</span>
+                  <span className="text-slate-400 font-normal">
+                    ${dest.estimatedBudgetPerDay}/day
+                  </span>
                 </div>
                 <h4 className="text-lg font-bold text-white group-hover/card:text-cyan-300 transition-colors line-clamp-1">
                   {dest.name}
@@ -107,9 +144,14 @@ export const NetflixCarousels: React.FC<NetflixCarouselsProps> = ({
                 </p>
 
                 <div className="mt-3.5 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Season: <strong className="text-slate-200">{dest.bestSeason.split(' ')[0]}</strong></span>
+                  <span className="text-slate-400">
+                    Season:{' '}
+                    <strong className="text-slate-200">
+                      {dest.bestSeason.split(' ')[0]}
+                    </strong>
+                  </span>
                   <span className="flex items-center gap-1 text-cyan-400 font-medium">
-                    <span>Inspect</span>
+                    <span>Take a look</span>
                     <ChevronRight className="w-3 h-3" />
                   </span>
                 </div>
@@ -138,11 +180,11 @@ export const NetflixCarousels: React.FC<NetflixCarouselsProps> = ({
           <div className="absolute bottom-8 left-6 sm:left-12 max-w-2xl space-y-4">
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1 px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold uppercase tracking-wider">
-                <Flame className="w-3.5 h-3.5 text-cyan-400" />
-                #1 Curated Spotlight
+                <Flame className="w-3.5 h-3.5 text-cyan-400" />A little
+                inspiration
               </span>
               <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold">
-                {featured.matchScore}% Match
+                Worth exploring
               </span>
             </div>
 
@@ -168,7 +210,7 @@ export const NetflixCarousels: React.FC<NetflixCarouselsProps> = ({
                 className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-purple-600/90 hover:bg-purple-600 text-white font-bold text-sm backdrop-blur-md border border-purple-400/30 shadow-xl shadow-purple-900/30 transition duration-200 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4 text-purple-200" />
-                <span>AI Travel Architect</span>
+                <span>Help me plan</span>
               </button>
             </div>
           </div>

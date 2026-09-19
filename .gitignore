@@ -70,3 +70,9 @@ minio-licence.key
 
 .run
 .full-review
+
+# Current app build and browser test artifacts
+dist/
+playwright-report/
+test-results/
+image-search/

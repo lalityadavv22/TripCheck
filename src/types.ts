@@ -1,4 +1,5 @@
 export interface PlaceItem {
+  aliases?: string[];
   id: string;
   name: string;
   label: string;
@@ -7,7 +8,16 @@ export interface PlaceItem {
   country?: string;
   lat: number;
   lng: number;
-  type: 'monument' | 'city' | 'town' | 'village' | 'attraction' | 'airport' | 'nature' | 'heritage' | 'general';
+  type:
+    | 'monument'
+    | 'city'
+    | 'town'
+    | 'village'
+    | 'attraction'
+    | 'airport'
+    | 'nature'
+    | 'heritage'
+    | 'general';
   categoryLabel?: string;
 }
 
@@ -16,7 +26,13 @@ export interface Destination {
   name: string;
   country: string;
   region: string;
-  category: 'Trending' | 'Alpine Escapes' | 'Neon Cyberpunk Cities' | 'Tropical Sanctuaries' | 'Cultural Heritage' | 'Nordic Wilderness';
+  category:
+    | 'Trending'
+    | 'Alpine Escapes'
+    | 'Neon Cyberpunk Cities'
+    | 'Tropical Sanctuaries'
+    | 'Cultural Heritage'
+    | 'Nordic Wilderness';
   tagline: string;
   description: string;
   heroImage: string;
@@ -44,7 +60,8 @@ export interface ActivityItem {
   id: string;
   time: string;
   title: string;
-  category: 'flight' | 'lodging' | 'sightseeing' | 'food' | 'transport' | 'leisure';
+  category:
+    'flight' | 'lodging' | 'sightseeing' | 'food' | 'transport' | 'leisure';
   locationName: string;
   lat?: number;
   lng?: number;
@@ -62,6 +79,7 @@ export interface ItineraryDay {
 }
 
 export interface Trip {
+  planningNote?: string;
   id: string;
   title: string;
   destination: string;
@@ -79,7 +97,8 @@ export interface Trip {
 export interface Expense {
   id: string;
   tripId: string;
-  category: 'Flights' | 'Lodging' | 'Dining' | 'Activities' | 'Transit' | 'Misc';
+  category:
+    'Flights' | 'Lodging' | 'Dining' | 'Activities' | 'Transit' | 'Misc';
   amount: number;
   currency: string;
   description: string;
@@ -136,6 +155,7 @@ export interface FoodRecommendation {
 }
 
 export interface GeneratedTripPlan {
+  planningNote?: string;
   title: string;
   origin: string;
   originCoords: { lat: number; lng: number };
