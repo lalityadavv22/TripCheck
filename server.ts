@@ -1,11 +1,14 @@
 import express from 'express';
 import { searchPlacesGlobal } from './server/placeSearch';
 import { searchLocalPlaces, normalizePlaceQuery } from './src/utils/places';
-import { isGeneratedTripPlan } from './src/utils/validation';
+import { generateLivePlan, resolveModels } from './server/aiPlan';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+
+// Live plans are still suggestions: prices, stays and timings are estimates.
+const LIVE_PLAN_NOTICE =
+  'Live AI plan. Places, opening times, travel rules and prices are estimates — check them before you book.';
 
 dotenv.config();
 
@@ -352,7 +355,17 @@ app.get('/api/destinations', (req, res) => {
   res.json(destinations);
 });
 
-// AI Travel Architect (Gemini 3.8 Flash + Comprehensive Route & Itinerary Generator)
+// Whether this deployment can generate live plans, without exposing the key itself
+app.get('/api/ai/status', (req, res) => {
+  const models = resolveModels(process.env.GEMINI_MODEL);
+  res.json({
+    success: true,
+    live: Boolean(process.env.GEMINI_API_KEY),
+    models,
+  });
+});
+
+// AI Travel Architect — Gemini via GEMINI_MODEL (default gemini-2.5-flash)
 app.post('/api/ai/plan', async (req, res) => {
   const input = req.body;
   if (
@@ -433,183 +446,45 @@ app.post('/api/ai/plan', async (req, res) => {
   }
   const distanceKm = calculateDistanceKm(originCoords, destCoords);
 
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey) {
-      const ai = new GoogleGenAI({
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (apiKey) {
+    const outcome = await generateLivePlan(
+      {
+        origin: cleanOrigin,
+        destination: cleanDestination,
+        originCoords,
+        destCoords,
+        distanceKm,
+        days: Math.min(Math.max(Number(days) || 5, 1), 14),
+        travelers: Number(travelers) || 2,
+        groupType,
+        budgetTier: budgetTier || budget,
+        vibe,
+      },
+      {
         apiKey,
-        httpOptions: {
-          timeout: 25000,
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
+        models: resolveModels(process.env.GEMINI_MODEL),
+        baseUrl: process.env.GEMINI_BASE_URL || undefined,
+        timeoutMs: Number(process.env.GEMINI_TIMEOUT_MS) || undefined,
+        deadlineMs: Number(process.env.GEMINI_DEADLINE_MS) || undefined,
+        maxOutputTokens:
+          Number(process.env.GEMINI_MAX_OUTPUT_TOKENS) || undefined,
+        log: (message, detail) =>
+          console.warn(`[ai-plan] ${message}`, detail ?? ''),
+      }
+    );
+    if (outcome.status === 'ok') {
+      return res.json({
+        success: true,
+        source: 'ai',
+        model: outcome.model,
+        notice: LIVE_PLAN_NOTICE,
+        notes: outcome.notes,
+        plan: outcome.plan,
       });
-      const prompt = `You are an elite travel architect like TripCheck.
-Create a comprehensive, personalized travel itinerary and route guide.
-Origin (Leaving from): "${cleanOrigin}" (lat: ${originCoords.lat}, lng: ${originCoords.lng})
-Destination (Going to): "${cleanDestination}" (lat: ${destCoords.lat}, lng: ${destCoords.lng})
-Estimated distance: ${distanceKm} km
-Trip duration: ${days} days
-Travelers: ${travelers} (${groupType})
-Budget tier: "${budgetTier || budget}"
-Vibe: "${vibe}"
-
-CRITICAL MAPPING INSTRUCTION:
-The destination is located exactly at latitude: ${destCoords.lat}, longitude: ${destCoords.lng}.
-Only provide activity lat/lng coordinates when you know the actual location. Otherwise omit them. Never invent venues, ratings, weather forecasts, or coordinates. Costs are estimates, not booking quotes.
-
-Respond ONLY with pure valid JSON in this exact structure without markdown or backticks:
-{
-  "title": "${days}-Day ${cleanDestination} Journey from ${cleanOrigin}",
-  "origin": "${cleanOrigin}",
-  "destination": "${cleanDestination}",
-  "distanceKm": ${distanceKm},
-  "durationDays": ${days},
-  "travelers": ${travelers},
-  "groupType": "${groupType}",
-  "budgetTier": "${budgetTier || budget}",
-  "vibe": "${vibe}",
-  "summary": "Captivating 2-3 sentences describing this specific journey from ${cleanOrigin} to ${cleanDestination}.",
-  "transitOptions": [
-    {
-      "mode": "flight",
-      "title": "Commercial Airline Flight or Transit",
-      "duration": "Duration e.g. 2h 45m",
-      "estimatedCost": 120,
-      "details": "Major airlines, terminal & luggage guidelines",
-      "isRecommended": true
-    },
-    {
-      "mode": "train",
-      "title": "High-Speed Rail / Express Train",
-      "duration": "Duration e.g. 4h 15m or N/A",
-      "estimatedCost": 45,
-      "details": "Comfortable reserved coach or scenic rail route"
-    },
-    {
-      "mode": "car",
-      "title": "Road Highway / Cab / Self-Drive",
-      "duration": "Duration e.g. 3h 30m drive",
-      "estimatedCost": 60,
-      "details": "Scenic highway drive with highway stops"
     }
-  ],
-  "days": [
-    {
-      "dayNumber": 1,
-      "theme": "Arrival & Atmosphere",
-      "activities": [
-        { "time": "09:30", "title": "Morning Exploration", "category": "sightseeing", "location": "Historic Landmark", "cost": 20, "lat": ${destCoords.lat}, "lng": ${destCoords.lng}, "description": "Details about morning visit" },
-        { "time": "13:00", "title": "Authentic Regional Lunch", "category": "food", "location": "Famous Quarter", "cost": 30, "lat": ${destCoords.lat + 0.005}, "lng": ${destCoords.lng + 0.005}, "description": "Signature dining spot" },
-        { "time": "16:00", "title": "Afternoon Landmark", "category": "sightseeing", "location": "Heritage Monument", "cost": 15, "lat": ${destCoords.lat - 0.004}, "lng": ${destCoords.lng + 0.004}, "description": "Immersive highlight" },
-        { "time": "19:30", "title": "Evening Dinner & Nightfall Vibe", "category": "food", "location": "Waterfront or Promenade", "cost": 45, "lat": ${destCoords.lat + 0.002}, "lng": ${destCoords.lng - 0.006}, "description": "Atmospheric evening" }
-      ]
-    }
-  ],
-  "hotels": [
-    { "name": "Cozy Central Hostel/Inn", "tier": "Budget", "pricePerNight": 45, "rating": 4.6, "location": "Central area", "perks": ["Free Wi-Fi", "Walkable to metro", "Breakfast included"], "image": "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=600&q=80" },
-    { "name": "Heritage Boutique Hotel", "tier": "Boutique", "pricePerNight": 140, "rating": 4.85, "location": "Historic Quarter", "perks": ["Rooftop view", "Artisan breakfast", "Concierge"], "image": "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=600&q=80" },
-    { "name": "Grand Panorama Luxury Resort", "tier": "Luxury", "pricePerNight": 320, "rating": 4.96, "location": "Prime District", "perks": ["Infinity pool & Spa", "Michelin dining", "Chauffeur transfer"], "image": "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80" }
-  ],
-  "foodGuide": [
-    { "dishName": "Iconic Local Specialty", "dishType": "Local Delicacy", "description": "Must-taste traditional dish", "recommendedSpot": "Best historic eatery", "priceRange": "$15 - $25" },
-    { "dishName": "Famous Street Food", "dishType": "Street Food", "description": "Flavorful quick bite", "recommendedSpot": "Night Market stall", "priceRange": "$5 - $10" },
-    { "dishName": "Artisanal Dessert", "dishType": "Dessert", "description": "Sweet culinary indulgence", "recommendedSpot": "Local pastry house", "priceRange": "$8 - $14" }
-  ],
-  "weatherForecast": {
-    "avgTempC": 22,
-    "condition": "Pleasant & Clear",
-    "packingTip": "Layered light apparel, sun hat, and comfortable walking shoes",
-    "bestTimeToVisit": "March - May & September - November"
-  },
-  "budgetBreakdown": {
-    "transport": 350,
-    "accommodation": 400,
-    "food": 250,
-    "activities": 180,
-    "buffer": 100,
-    "totalPerPerson": 1280
-  },
-  "packingAdvice": [
-    "Passport & digital copies of reservations",
-    "Universal multi-pin plug adapter & high-capacity power bank",
-    "Weather-appropriate breathable layers & walking footwear",
-    "Local currency cash for street food stalls and small cafes"
-  ],
-  "translations": {
-    "hi": { "languageName": "Hindi", "greeting": "नमस्ते", "summary": "Hindi translation of summary" },
-    "es": { "languageName": "Spanish", "greeting": "¡Hola!", "summary": "Spanish translation of summary" },
-    "fr": { "languageName": "French", "greeting": "Bonjour", "summary": "French translation of summary" }
-  }
-}`;
-
-      let response;
-      // List of supported high-performance models in priority order according to skill guidance
-      const candidateModels = [process.env.GEMINI_MODEL || 'gemini-2.5-flash'];
-      let lastModelError: any = null;
-
-      for (const modelName of candidateModels) {
-        for (let attempt = 0; attempt < 1; attempt++) {
-          try {
-            response = await ai.models.generateContent({
-              model: modelName,
-              contents: prompt,
-              config: {
-                responseMimeType: 'application/json',
-              },
-            });
-            if (response && response.text) {
-              break;
-            }
-          } catch (modelErr: any) {
-            lastModelError = modelErr;
-            const isSpikeOrUnavailable =
-              modelErr?.status === 'UNAVAILABLE' ||
-              modelErr?.code === 503 ||
-              String(modelErr?.message || '').includes('high demand') ||
-              String(modelErr?.message || '').includes('503');
-
-            if (isSpikeOrUnavailable && attempt === 0) {
-              // Quick 500ms jitter before retry or next model
-              await new Promise((r) => setTimeout(r, 500));
-              continue;
-            }
-            // Move to next candidate model
-            break;
-          }
-        }
-        if (response && response.text) break;
-      }
-
-      if (response && response.text) {
-        const text = response.text || '';
-        const cleanJson = text
-          .replace(/```json/gi, '')
-          .replace(/```/g, '')
-          .trim();
-        const parsed = JSON.parse(cleanJson);
-        parsed.originCoords = originCoords;
-        parsed.destCoords = destCoords;
-        parsed.durationDays = days;
-        parsed.travelers = travelers;
-        parsed.origin = cleanOrigin;
-        parsed.destination = cleanDestination;
-        parsed.distanceKm = distanceKm;
-        if (!isGeneratedTripPlan(parsed))
-          throw new Error('Incomplete generated plan');
-        return res.json({ success: true, source: 'ai', plan: parsed });
-      } else if (lastModelError) {
-        console.warn(
-          'Gemini models temporarily at capacity, serving high-fidelity tailored plan:',
-          lastModelError?.message || lastModelError
-        );
-      }
-    }
-  } catch (err: any) {
     console.warn(
-      'Gemini API call warning, using tailored offline plan:',
-      err?.message || err
+      `Live trip generation unavailable (${outcome.model}, ${outcome.attempts} attempt(s)): ${outcome.reason}. Serving the labelled sample plan.`
     );
   }
 
@@ -812,10 +687,11 @@ Respond ONLY with pure valid JSON in this exact structure without markdown or ba
       },
     ],
     weatherForecast: {
-      avgTempC: 22,
-      condition: 'Clear Skies & Mild Breeze',
+      // No live forecast is fetched, so no temperature is claimed.
+      avgTempC: null,
+      condition: 'Not included',
       packingTip:
-        'Light breathable daytime attire, a light evening jacket, and sturdy comfortable footwear.',
+        'Check a live forecast for your dates; pack layers and comfortable walking shoes.',
       bestTimeToVisit: 'Spring (March – May) & Autumn (September – November)',
     },
     budgetBreakdown: {

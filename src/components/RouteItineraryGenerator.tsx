@@ -183,7 +183,9 @@ export const RouteItineraryGenerator: React.FC<
         method: 'POST',
         signal: AbortSignal.any([
           controller.signal,
-          AbortSignal.timeout(40000),
+          // Longer than the server's live-generation budget so retries can finish
+          // and the caller still gets either a live plan or the labelled sample.
+          AbortSignal.timeout(75000),
         ]),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -209,10 +211,15 @@ export const RouteItineraryGenerator: React.FC<
         throw new Error(
           data.error || 'We couldn’t create your trip. Please try again.'
         );
+      const repairNotes =
+        Array.isArray(data.notes) && data.notes.length
+          ? ` ${data.notes.join(' ')}`
+          : '';
       setNotice(
-        data.source === 'sample'
-          ? data.notice
-          : 'AI suggestions — verify places, opening times, travel requirements and prices before booking.'
+        (data.notice ||
+          (data.source === 'sample'
+            ? 'Sample plan — live AI is unavailable.'
+            : 'AI suggestions — verify places, opening times, travel requirements and prices before booking.')) + repairNotes
       );
       clearInterval(stepTimer);
 
@@ -586,12 +593,21 @@ export const RouteItineraryGenerator: React.FC<
                   {/* Weather forecast */}
                   <div className="flex items-center gap-2 text-xs text-slate-300">
                     <CloudSun className="w-4 h-4 text-amber-400" />
-                    <span className="font-bold text-white">
-                      {generatedPlan.weatherForecast.avgTempC}°C
-                    </span>
-                    <span className="text-slate-400">
-                      ({generatedPlan.weatherForecast.condition})
-                    </span>
+                    {typeof generatedPlan.weatherForecast.avgTempC ===
+                    'number' ? (
+                      <>
+                        <span className="font-bold text-white">
+                          {generatedPlan.weatherForecast.avgTempC}°C
+                        </span>
+                        <span className="text-slate-400">
+                          ({generatedPlan.weatherForecast.condition})
+                        </span>
+                      </>
+                    ) : (
+                      <span className="font-bold text-white">
+                        No live forecast included
+                      </span>
+                    )}
                     <span className="hidden md:inline text-slate-500">
                       • {generatedPlan.weatherForecast.packingTip}
                     </span>

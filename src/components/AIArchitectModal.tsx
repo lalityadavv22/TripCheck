@@ -74,7 +74,9 @@ export const AIArchitectModal: React.FC<AIArchitectModalProps> = ({
         method: 'POST',
         signal: AbortSignal.any([
           controller.signal,
-          AbortSignal.timeout(40000),
+          // Longer than the server's live-generation budget so retries can finish
+          // and the caller still gets either a live plan or the labelled sample.
+          AbortSignal.timeout(75000),
         ]),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -94,10 +96,15 @@ export const AIArchitectModal: React.FC<AIArchitectModalProps> = ({
         throw new Error(
           data.error || 'We couldn’t make your plan. Please try again.'
         );
+      const repairNotes =
+        Array.isArray(data.notes) && data.notes.length
+          ? ` ${data.notes.join(' ')}`
+          : '';
       setNotice(
-        data.source === 'sample'
-          ? data.notice
-          : 'AI suggestions — double-check places, costs and opening times before you go.'
+        (data.notice ||
+          (data.source === 'sample'
+            ? 'Sample plan — live AI is unavailable.'
+            : 'AI suggestions — double-check places, costs and opening times before you go.')) + repairNotes
       );
       setGeneratedPlan({
         ...data.plan,

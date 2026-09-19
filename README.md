@@ -6,7 +6,8 @@
 - **Google Maps links instead of embedded maps**: open the actual destination, individual stop or origin-to-destination directions.
 - **Worldwide place search**, including Gurugram/Gurgaon/Hindi aliases, a server-side 135k+ city/town index, live village/landmark search, and a Google Maps fallback for any typed name. [Coverage, setup and attribution](docs/PLACE_SEARCH.md).
 - **Cursor glow** with hover/press feedback and a persistent on/off switch. Native pointer stays visible; effects are disabled on touch and with reduced motion.
-- `GEMINI_API_KEY` enables live AI planning; without it, plans are clearly labeled samples. `GEOAPIFY_API_KEY` optionally enables a second geocoder. Both keys are server-only. Copy `.env.example` to `.env` for local configuration; production uses `npm run build` then `NODE_ENV=production npm start`.
+- **Live AI trip planning** with `GEMINI_API_KEY`; without it, plans are clearly labeled samples. `GEMINI_MODEL` takes a comma-separated priority list, requests retry through capacity spikes, truncated model JSON is repaired, and the response schema keeps long itineraries well formed. `GET /api/ai/status` reports whether this deployment can generate live plans, without exposing the key. `GEOAPIFY_API_KEY` optionally enables a second geocoder. Both keys are server-only. Copy `.env.example` to `.env` for local configuration; production uses `npm run build` then `NODE_ENV=production npm start`.
+- Live plans never invent map pins: an activity keeps coordinates only when the model supplies real ones, and any coordinate copied from the destination centre is dropped. Missing sections stay labelled rather than being filled with invented weather or venues.
 
 For tested behavior and remaining limitations, see [the verification report](docs/TESTING.md).
 
