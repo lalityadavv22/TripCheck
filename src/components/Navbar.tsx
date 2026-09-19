@@ -13,7 +13,9 @@ import {
   Menu,
   ChevronRight,
 } from 'lucide-react';
-import { Destination } from '../types';
+import { Destination, PlaceItem } from '../types';
+import { usePlaceSearch } from '../hooks/usePlaceSearch';
+import { GoogleMapsLink } from './GoogleMapsLink';
 import { useDialog } from '../hooks/useDialog';
 
 export type ActiveTab =
@@ -33,6 +35,9 @@ interface Props {
   onOpenAIArchitect: () => void;
   destinations: Destination[];
   onSelectDestination: (dest: Destination) => void;
+  onPlanPlace: (place: PlaceItem) => void;
+  cursorEffects: boolean;
+  onToggleCursorEffects: () => void;
 }
 export function Navbar({
   activeTab,
@@ -40,10 +45,17 @@ export function Navbar({
   onOpenAIArchitect,
   destinations,
   onSelectDestination,
+  onPlanPlace,
+  cursorEffects,
+  onToggleCursorEffects,
 }: Props) {
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { places, loading, notice, attribution } = usePlaceSearch(
+    search,
+    searchOpen
+  );
   const dialogRef = useDialog(searchOpen, () => setSearchOpen(false));
   const filtered = destinations.filter((d) =>
     `${d.name} ${d.country} ${d.tags.join(' ')}`
@@ -106,6 +118,21 @@ export function Navbar({
             Try the trip assistant <ArrowUpRight size={16} />
           </button>
         </div>
+        <button
+          className="cursor-toggle"
+          role="switch"
+          aria-checked={cursorEffects}
+          onClick={onToggleCursorEffects}
+        >
+          <Sparkles size={15} />
+          <span>Cursor glow</span>
+          <span
+            aria-hidden="true"
+            className={`toggle-track ${cursorEffects ? 'on' : ''}`}
+          >
+            <i />
+          </span>
+        </button>
         <div className="sidebar-footer">
           <span className="profile-avatar">Y</span>
           <div>
@@ -157,33 +184,84 @@ export function Navbar({
               <input
                 data-autofocus
                 aria-label="Search destinations"
-                placeholder="Try Tokyo, Italy, or beaches…"
+                placeholder="Try Gurugram, a village, or a landmark…"
+                maxLength={200}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="search-results">
-              {filtered.length ? (
-                filtered.map((d) => (
-                  <button
-                    key={d.id}
-                    onClick={() => {
-                      onSelectDestination(d);
-                      setSearchOpen(false);
-                    }}
-                  >
-                    <img src={d.heroImage} alt="" />
-                    <div>
-                      <strong>{d.name}</strong>
-                      <span>{d.country}</span>
+            <p className="place-search-note">
+              Search cities, towns, villages and landmarks worldwide. Add a
+              state or country for a closer match.
+            </p>
+            <div className="global-search-scroll">
+              {search.trim().length >= 2 && (
+                <div className="worldwide-results">
+                  <h3>Places worldwide</h3>
+                  {places.map((place) => (
+                    <div className="worldwide-place" key={place.id}>
+                      <Map size={17} />
+                      <div>
+                        <strong>{place.name}</strong>
+                        <span>{place.label}</span>
+                        <GoogleMapsLink
+                          place={place.label}
+                          label="Google Maps"
+                        />
+                      </div>
+                      <button
+                        className="primary-button"
+                        aria-label={`Plan a trip to ${place.label}`}
+                        onClick={() => {
+                          onPlanPlace(place);
+                          setSearchOpen(false);
+                        }}
+                      >
+                        Plan trip <ArrowUpRight size={14} />
+                      </button>
                     </div>
-                    <span>~${d.estimatedBudgetPerDay}/day</span>
-                    <ChevronRight size={16} />
-                  </button>
-                ))
-              ) : (
-                <p>No matches yet. Try another city or country.</p>
+                  ))}
+                  {loading && (
+                    <p className="place-search-note">Searching worldwide…</p>
+                  )}
+                  {!loading && !places.length && (
+                    <p className="place-search-note">
+                      No matches yet. Try adding a district, state or country.
+                    </p>
+                  )}
+                  {notice && <p className="place-search-note">{notice}</p>}
+                  {attribution && (
+                    <p className="place-attribution">{attribution}</p>
+                  )}
+                  <GoogleMapsLink
+                    place={search}
+                    label="Search this name on Google Maps"
+                  />
+                </div>
               )}
+              <div className="search-results">
+                {filtered.length ? (
+                  filtered.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => {
+                        onSelectDestination(d);
+                        setSearchOpen(false);
+                      }}
+                    >
+                      <img src={d.heroImage} alt="" />
+                      <div>
+                        <strong>{d.name}</strong>
+                        <span>{d.country}</span>
+                      </div>
+                      <span>~${d.estimatedBudgetPerDay}/day</span>
+                      <ChevronRight size={16} />
+                    </button>
+                  ))
+                ) : search.trim().length < 2 ? (
+                  <p>Type at least 2 characters to search worldwide.</p>
+                ) : null}
+              </div>
             </div>
           </section>
         </div>

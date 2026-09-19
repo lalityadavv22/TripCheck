@@ -72,3 +72,26 @@ test('unresolvable destinations fail honestly instead of invented coordinates', 
   expect(response.status()).toBe(422);
   expect((await response.json()).error).toContain('couldn’t locate');
 });
+
+test('Gurugram, Gurgaon and Hindi are available from autocomplete', async ({
+  request,
+}) => {
+  for (const q of ['Gurugram', 'Gurgaon', 'गुरुग्राम']) {
+    const response = await request.get(
+      `/api/places/autocomplete?q=${encodeURIComponent(q)}`
+    );
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    expect(body.places[0].name).toBe('Gurugram');
+  }
+});
+test('invalid autocomplete input is rejected', async ({ request }) => {
+  expect(
+    (
+      await request.get(`/api/places/autocomplete?q=${'x'.repeat(201)}`)
+    ).status()
+  ).toBe(400);
+  expect(
+    (await request.get('/api/places/autocomplete?q[]=a&q[]=b')).status()
+  ).toBe(400);
+});

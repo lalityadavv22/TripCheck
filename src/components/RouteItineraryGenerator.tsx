@@ -1,7 +1,6 @@
 import { isGeneratedTripPlan } from '../utils/validation';
 import { useDialog } from '../hooks/useDialog';
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles,
   MapPin,
@@ -28,7 +27,7 @@ import {
   X,
 } from 'lucide-react';
 import { GeneratedTripPlan, PlaceItem } from '../types';
-import { HighRes2DRouteMap } from './HighRes2DRouteMap';
+import { GoogleMapsCard } from './GoogleMapsLink';
 import { PlaceAutocompleteInput } from './PlaceAutocompleteInput';
 
 interface RouteItineraryGeneratorProps {
@@ -36,6 +35,8 @@ interface RouteItineraryGeneratorProps {
   onClose: () => void;
   onImportTrip: (plan: GeneratedTripPlan) => void;
   defaultOrigin?: string;
+  defaultOriginPlace?: PlaceItem | null;
+  defaultDestinationPlace?: PlaceItem | null;
   defaultDestination?: string;
 }
 
@@ -79,6 +80,8 @@ export const RouteItineraryGenerator: React.FC<
   onClose,
   onImportTrip,
   defaultOrigin = '',
+  defaultOriginPlace = null,
+  defaultDestinationPlace = null,
   defaultDestination = '',
 }) => {
   const requestRef = React.useRef<AbortController | null>(null);
@@ -122,21 +125,26 @@ export const RouteItineraryGenerator: React.FC<
     'en' | 'hi' | 'es' | 'fr'
   >('en');
   const [expandedDay, setExpandedDay] = useState<number>(1);
-  const [selectedMapPoint, setSelectedMapPoint] = useState<any>(null);
 
   React.useEffect(() => {
     if (isOpen) {
       setOrigin(defaultOrigin);
       setDestination(defaultDestination);
-      setOriginPlace(null);
-      setDestinationPlace(null);
+      setOriginPlace(defaultOriginPlace);
+      setDestinationPlace(defaultDestinationPlace);
       setGeneratedPlan(null);
       setError('');
       setNotice('');
       setSelectedLanguage('en');
       setActiveTab('itinerary');
     }
-  }, [isOpen, defaultOrigin, defaultDestination]);
+  }, [
+    isOpen,
+    defaultOrigin,
+    defaultDestination,
+    defaultOriginPlace,
+    defaultDestinationPlace,
+  ]);
 
   const loadingSteps = [
     'Finding your starting point…',
@@ -240,42 +248,16 @@ export const RouteItineraryGenerator: React.FC<
     setVibe(route.vibe);
   };
 
-  const getPointsForMap = () => {
-    if (!generatedPlan) return [];
-    const pts: any[] = [];
-    generatedPlan.days.forEach((d) => {
-      d.activities.forEach((act, idx) => {
-        if (Number.isFinite(act.lat) && Number.isFinite(act.lng)) {
-          pts.push({
-            id: `pt-${d.dayNumber}-${idx}`,
-            title: act.title,
-            lat: act.lat,
-            lng: act.lng,
-            category: act.category,
-            time: act.time,
-            cost: act.cost,
-            day: d.dayNumber,
-          });
-        }
-      });
-    });
-    return pts;
-  };
-
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
-      <motion.div
+      <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Plan your trip"
-        initial={{ opacity: 0, scale: 0.96, y: 15 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 15 }}
-        transition={{ duration: 0.25, ease: 'easeOut' }}
-        className="w-full max-w-5xl my-auto rounded-3xl bg-slate-900 border border-slate-700/80 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+        className="trip-dialog-enter w-full max-w-5xl my-auto rounded-3xl bg-slate-900 border border-slate-700/80 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
       >
         {/* Header Bar */}
         <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between gap-4">
@@ -523,14 +505,9 @@ export const RouteItineraryGenerator: React.FC<
             </p>
           )}
           {/* Loading Animation State */}
-          <AnimatePresence>
+          <>
             {isLoading && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="p-8 rounded-2xl bg-slate-950/80 border border-cyan-500/40 text-center space-y-4 shadow-xl"
-              >
+              <div className="p-8 rounded-2xl bg-slate-950/80 border border-cyan-500/40 text-center space-y-4 shadow-xl">
                 <div className="relative w-16 h-16 mx-auto">
                   <div className="absolute inset-0 rounded-full border-4 border-cyan-500/20 border-t-cyan-500 animate-spin" />
                   <div
@@ -555,26 +532,20 @@ export const RouteItineraryGenerator: React.FC<
                 </div>
 
                 <div className="w-full max-w-md mx-auto bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                  <motion.div
-                    className="bg-gradient-to-r from-cyan-500 to-purple-500 h-full"
-                    initial={{ width: '10%' }}
-                    animate={{
+                  <div
+                    className="bg-gradient-to-r from-cyan-500 to-purple-500 h-full transition-[width] duration-500"
+                    style={{
                       width: `${((loadingStep + 1) / loadingSteps.length) * 100}%`,
                     }}
-                    transition={{ duration: 0.5 }}
                   />
                 </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+          </>
 
           {/* Generated Plan Presentation */}
           {generatedPlan && !isLoading && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
+            <div className="space-y-6">
               {/* Summary Hero Banner */}
               <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-cyan-500/30 shadow-xl space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -655,29 +626,10 @@ export const RouteItineraryGenerator: React.FC<
                 </div>
               </div>
 
-              {/* High-Resolution 2D Map Route View */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Navigation className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Your route, at a glance</span>
-                  </h4>
-                  <span className="text-[11px] text-slate-400">
-                    Schematic route, not turn-by-turn directions
-                  </span>
-                </div>
-
-                <HighRes2DRouteMap
-                  originCoords={generatedPlan.originCoords}
-                  originName={generatedPlan.origin}
-                  destCoords={generatedPlan.destCoords}
-                  destName={generatedPlan.destination}
-                  points={getPointsForMap()}
-                  selectedPointId={selectedMapPoint?.id}
-                  onSelectPoint={(pt) => setSelectedMapPoint(pt)}
-                  className="h-[380px]"
-                />
-              </div>
+              <GoogleMapsCard
+                destination={generatedPlan.destination}
+                origin={generatedPlan.origin}
+              />
 
               {/* Detailed View Tabs */}
               <div className="space-y-4">
@@ -979,10 +931,10 @@ export const RouteItineraryGenerator: React.FC<
                   </div>
                 )}
               </div>
-            </motion.div>
+            </div>
           )}
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };

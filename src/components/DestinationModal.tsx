@@ -1,3 +1,4 @@
+import { GoogleMapsLink } from './GoogleMapsLink';
 import { useDialog } from '../hooks/useDialog';
 import React, { useState, useEffect } from 'react';
 import { Destination } from '../types';
@@ -120,7 +121,10 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <GoogleMapsLink
+                place={`${destination.name}, ${destination.country}`}
+              />
               <button
                 onClick={() => {
                   onClose();

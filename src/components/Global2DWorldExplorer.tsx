@@ -1,4 +1,4 @@
-import React, { useMemo, useState, lazy, Suspense } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   ArrowRight,
@@ -7,19 +7,12 @@ import {
   Mountain,
   Waves,
   Landmark,
-  LayoutGrid,
-  Map,
   Heart,
   Leaf,
   Globe2,
-  X,
 } from 'lucide-react';
 import { Destination } from '../types';
-const HighRes2DRouteMap = lazy(() =>
-  import('./HighRes2DRouteMap').then((module) => ({
-    default: module.HighRes2DRouteMap,
-  }))
-);
+import { GoogleMapsLink } from './GoogleMapsLink';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface Props {
@@ -44,11 +37,9 @@ export function Global2DWorldExplorer({
   children,
 }: Props) {
   const [category, setCategory] = useState('All');
-  const [view, setView] = useState<'grid' | 'map'>('grid');
   const [saved, setSaved] = useLocalStorage<string[]>('saved-destinations', []);
   const [savedOnly, setSavedOnly] = useState(false);
   const [sort, setSort] = useState('recommended');
-  const [selected, setSelected] = useState<string | null>(null);
   const filtered = useMemo(() => {
     const result = destinations.filter(
       (d) =>
@@ -59,7 +50,6 @@ export function Global2DWorldExplorer({
       ? result.sort((a, b) => a.estimatedBudgetPerDay - b.estimatedBudgetPerDay)
       : result;
   }, [destinations, category, savedOnly, saved, sort]);
-  const active = destinations.find((d) => d.id === selected);
   return (
     <div className="explore-content">
       <section className="explore-hero">
@@ -106,22 +96,6 @@ export function Global2DWorldExplorer({
             <span className="eyebrow">A LITTLE INSPIRATION</span>
             <h2>Where to next?</h2>
             <p>Good places. Great memories. Pick your kind of getaway.</p>
-          </div>
-          <div className="view-switch" aria-label="Destination view">
-            <button
-              className={view === 'grid' ? 'selected' : ''}
-              aria-pressed={view === 'grid'}
-              onClick={() => setView('grid')}
-            >
-              <LayoutGrid size={16} /> Grid
-            </button>
-            <button
-              className={view === 'map' ? 'selected' : ''}
-              aria-pressed={view === 'map'}
-              onClick={() => setView('map')}
-            >
-              <Map size={16} /> Map
-            </button>
           </div>
         </div>
         <div className="filter-row">
@@ -182,53 +156,6 @@ export function Global2DWorldExplorer({
               Explore all places <ArrowRight size={16} />
             </button>
           </div>
-        ) : view === 'map' ? (
-          <div className="explore-map">
-            <Suspense
-              fallback={
-                <div className="empty-state" role="status">
-                  Opening the map…
-                </div>
-              }
-            >
-              <HighRes2DRouteMap
-                destCoords={{ lat: filtered[0].lat, lng: filtered[0].lng }}
-                destName={filtered[0].name}
-                points={filtered.map((d) => ({
-                  id: d.id,
-                  lat: d.lat,
-                  lng: d.lng,
-                  title: d.name,
-                  description: d.country,
-                }))}
-                onSelectPoint={(p) => setSelected(p.id)}
-                selectedPointId={selected || undefined}
-                defaultLayer="voyager"
-                className="explore-map-canvas"
-              />
-            </Suspense>
-            {active && (
-              <div className="map-selection">
-                <button
-                  className="icon-button"
-                  aria-label="Close map selection"
-                  onClick={() => setSelected(null)}
-                >
-                  <X size={16} />
-                </button>
-                <h3>{active.name}</h3>
-                <p>
-                  {active.country} · From ${active.estimatedBudgetPerDay}/day
-                </p>
-                <button
-                  className="primary-button"
-                  onClick={() => onSelectDestination(active)}
-                >
-                  Explore this place <ArrowUpRight size={16} />
-                </button>
-              </div>
-            )}
-          </div>
         ) : (
           <div className="destination-grid">
             {filtered.map((d, index) => (
@@ -287,6 +214,7 @@ export function Global2DWorldExplorer({
                     {d.name}
                   </button>
                   <p>{d.tagline}</p>
+                  <GoogleMapsLink place={`${d.name}, ${d.country}`} />
                   <div className="card-footer">
                     <span>
                       From <strong>${d.estimatedBudgetPerDay}</strong>

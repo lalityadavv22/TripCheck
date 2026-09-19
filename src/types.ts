@@ -1,4 +1,5 @@
 export interface PlaceItem {
+  aliases?: string[];
   id: string;
   name: string;
   label: string;

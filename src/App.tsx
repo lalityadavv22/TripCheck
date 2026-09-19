@@ -1,3 +1,4 @@
+import { CursorEffects } from './components/CursorEffects';
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { dateAfter, today, importDays } from './utils/trip';
@@ -55,6 +56,7 @@ import {
   Expense,
   VotingCard,
   GeneratedTripPlan,
+  PlaceItem,
 } from './types';
 import { Plus as PlusIcon, ArrowRight, Navigation } from 'lucide-react';
 
@@ -72,6 +74,15 @@ export function App() {
   const [aiDestinationHint, setAiDestinationHint] = useState('');
   const [quickOrigin, setQuickOrigin] = useState('');
   const [quickDestination, setQuickDestination] = useState('');
+  const [quickOriginPlace, setQuickOriginPlace] = useState<PlaceItem | null>(
+    null
+  );
+  const [quickDestinationPlace, setQuickDestinationPlace] =
+    useState<PlaceItem | null>(null);
+  const [cursorEffects, setCursorEffects] = useLocalStorage(
+    'cursor-effects',
+    true
+  );
 
   // Expenses state
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', [
@@ -253,7 +264,6 @@ export function App() {
         const image = event.target;
         if (
           image instanceof HTMLImageElement &&
-          !image.classList.contains('leaflet-tile') &&
           !image.src.endsWith('/images/travel-placeholder.svg')
         )
           image.src = '/images/travel-placeholder.svg';
@@ -275,8 +285,16 @@ export function App() {
           </button>
         </div>
       )}
+      <CursorEffects enabled={cursorEffects} />
       {/* Top Navbar */}
       <Navbar
+        cursorEffects={cursorEffects}
+        onToggleCursorEffects={() => setCursorEffects((value) => !value)}
+        onPlanPlace={(place) => {
+          setQuickDestination(place.label);
+          setQuickDestinationPlace(place);
+          setIsRouteGenOpen(true);
+        }}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onOpenAIArchitect={() => handleOpenAIWithDest()}
@@ -311,13 +329,14 @@ export function App() {
             </div>
           }
         >
-          {/* Tab 1: High-Resolution 2D Global Route Explorer */}
+          {/* Tab 1: Destination inspiration */}
           {activeTab === 'routes' && (
             <Global2DWorldExplorer
               destinations={destinations}
               onSelectDestination={(dest) => setSelectedDestination(dest)}
               onPlanTripTo={(cityName) => {
                 setQuickDestination(cityName);
+                setQuickDestinationPlace(null);
                 setIsRouteGenOpen(true);
               }}
               userOrigin={quickOrigin}
@@ -346,7 +365,10 @@ export function App() {
                     showCoordinatesBadge={false}
                     iconType="origin"
                     value={quickOrigin}
-                    onChange={setQuickOrigin}
+                    onChange={(value, place) => {
+                      setQuickOrigin(value);
+                      setQuickOriginPlace(place || null);
+                    }}
                     placeholder="Your city or airport"
                   />
                 </div>
@@ -359,7 +381,10 @@ export function App() {
                     showCoordinatesBadge={false}
                     iconType="destination"
                     value={quickDestination}
-                    onChange={setQuickDestination}
+                    onChange={(value, place) => {
+                      setQuickDestination(value);
+                      setQuickDestinationPlace(place || null);
+                    }}
                     placeholder="Somewhere new…"
                   />
                 </div>
@@ -379,7 +404,7 @@ export function App() {
             />
           )}
 
-          {/* Tab 3: Trip Itinerary & Map View */}
+          {/* Tab 3: Itinerary and Google Maps links */}
           {activeTab === 'planner' && (
             <TripPlannerView
               key={activeTrip.id}
@@ -454,6 +479,8 @@ export function App() {
             onClose={() => setIsRouteGenOpen(false)}
             onImportTrip={handleImportGeneratedPlan}
             defaultOrigin={quickOrigin}
+            defaultOriginPlace={quickOriginPlace}
+            defaultDestinationPlace={quickDestinationPlace}
             defaultDestination={quickDestination}
           />
         )}

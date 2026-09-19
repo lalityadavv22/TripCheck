@@ -1,4 +1,10 @@
-import { Destination, Trip, VotingCard, EmergencyInfo, PackingItem } from '../types';
+import {
+  Destination,
+  Trip,
+  VotingCard,
+  EmergencyInfo,
+  PackingItem,
+} from '../types';
 
 export const DESTINATIONS: Destination[] = [
   {
@@ -8,7 +14,8 @@ export const DESTINATIONS: Destination[] = [
     region: 'Asia',
     category: 'Neon Cyberpunk Cities',
     tagline: 'Where ancient shrines meet neon-drenched sky-scrapers',
-    description: 'An electric metropolis where centuries-old traditions fuse seamlessly with futuristic technology, Michelin-starred culinary artistry, and vibrant subcultures.',
+    description:
+      'An electric metropolis where centuries-old traditions fuse seamlessly with futuristic technology, Michelin-starred culinary artistry, and vibrant subcultures.',
     heroImage: '/images/tokyo.jpg',
     galleryImages: [
       'https://images.unsplash.com/photo-1542051841857-5f90071e7989?auto=format&fit=crop&w=800&q=80',
@@ -25,7 +32,12 @@ export const DESTINATIONS: Destination[] = [
     bestSeason: 'March – May & Sept – Nov',
     visaRequirement: 'Visa-free for 90 days (68+ countries)',
     tags: ['Cyberpunk', 'Culinary', 'Culture', 'High-Speed Rail'],
-    highlights: ['Shibuya Crossing & Sky Observatory', 'TeamLab Planets Immersive Art', 'Tsukiji Outer Market Tasting Tour', 'Akihabara Tech District & Senso-ji'],
+    highlights: [
+      'Shibuya Crossing & Sky Observatory',
+      'TeamLab Planets Immersive Art',
+      'Tsukiji Outer Market Tasting Tour',
+      'Akihabara Tech District & Senso-ji',
+    ],
     weather: { temp: 18, condition: 'Clear', icon: 'Sun', humidity: 52 },
   },
   {
@@ -35,7 +47,8 @@ export const DESTINATIONS: Destination[] = [
     region: 'Europe',
     category: 'Nordic Wilderness',
     tagline: 'Land of fire, emerald aurora glaciers, and geothermal springs',
-    description: 'Venture into primeval volcanic landscapes, cascading basalt waterfalls, crystalline ice caves, and unwind in world-renowned thermal lagoons under the Northern Lights.',
+    description:
+      'Venture into primeval volcanic landscapes, cascading basalt waterfalls, crystalline ice caves, and unwind in world-renowned thermal lagoons under the Northern Lights.',
     heroImage: '/images/iceland.jpg',
     galleryImages: [
       'https://images.unsplash.com/photo-1529963183134-61a90db47eaf?auto=format&fit=crop&w=800&q=80',
@@ -52,8 +65,18 @@ export const DESTINATIONS: Destination[] = [
     bestSeason: 'Sept – March (Aurora) or June – Aug (Midnight Sun)',
     visaRequirement: 'Schengen Visa regulations apply',
     tags: ['Aurora', 'Hot Springs', 'Glaciers', 'Adventure'],
-    highlights: ['Blue Lagoon & Sky Lagoon Geothermal Spa', 'Golden Circle Geysir & Gullfoss', 'Katla Glacier Ice Cave Expedition', 'Vík Black Sand Beach & Diamond Beach'],
-    weather: { temp: 4, condition: 'Chilly & Clear', icon: 'CloudSnow', humidity: 78 },
+    highlights: [
+      'Blue Lagoon & Sky Lagoon Geothermal Spa',
+      'Golden Circle Geysir & Gullfoss',
+      'Katla Glacier Ice Cave Expedition',
+      'Vík Black Sand Beach & Diamond Beach',
+    ],
+    weather: {
+      temp: 4,
+      condition: 'Chilly & Clear',
+      icon: 'CloudSnow',
+      humidity: 78,
+    },
   },
   {
     id: 'bali-indonesia',
@@ -62,7 +85,8 @@ export const DESTINATIONS: Destination[] = [
     region: 'Southeast Asia',
     category: 'Tropical Sanctuaries',
     tagline: 'Emerald rice terraces, spiritual water temples & oceanic cliffs',
-    description: 'An island paradise teeming with spiritual serenity in Ubud, dramatic coastal surf breaks in Uluwatu, and secluded turquoise coves in Nusa Penida.',
+    description:
+      'An island paradise teeming with spiritual serenity in Ubud, dramatic coastal surf breaks in Uluwatu, and secluded turquoise coves in Nusa Penida.',
     heroImage: '/images/bali.jpg',
     galleryImages: [
       'https://images.unsplash.com/photo-1555400038-63f5ba517a47?auto=format&fit=crop&w=800&q=80',
@@ -78,8 +102,18 @@ export const DESTINATIONS: Destination[] = [
     bestSeason: 'April – October (Dry Season)',
     visaRequirement: 'Visa on Arrival (VoA) 30 days',
     tags: ['Tropical', 'Wellness', 'Surfing', 'Temples'],
-    highlights: ['Tegallalang Sacred Rice Terraces', 'Uluwatu Sunset Fire Dance', 'Kelingking T-Rex Beach Viewpoint', 'Scuba Diving with Manta Rays'],
-    weather: { temp: 29, condition: 'Tropical Warmth', icon: 'Sun', humidity: 75 },
+    highlights: [
+      'Tegallalang Sacred Rice Terraces',
+      'Uluwatu Sunset Fire Dance',
+      'Kelingking T-Rex Beach Viewpoint',
+      'Scuba Diving with Manta Rays',
+    ],
+    weather: {
+      temp: 29,
+      condition: 'Tropical Warmth',
+      icon: 'Sun',
+      humidity: 75,
+    },
   },
   {
     id: 'zermatt-switzerland',
@@ -88,7 +122,8 @@ export const DESTINATIONS: Destination[] = [
     region: 'Europe',
     category: 'Alpine Escapes',
     tagline: 'Iconic pyramidal alpine peaks, pristine powder & luxury chalets',
-    description: 'A car-free alpine wonderland at the foot of the legendary Matterhorn peak, featuring the highest cable car in Europe and pristine glacier ski routes.',
+    description:
+      'A car-free alpine wonderland at the foot of the legendary Matterhorn peak, featuring the highest cable car in Europe and pristine glacier ski routes.',
     heroImage: '/images/zermatt.jpg',
     galleryImages: [
       'https://images.unsplash.com/photo-1491557345352-5929e343eb89?auto=format&fit=crop&w=800&q=80',
@@ -104,8 +139,18 @@ export const DESTINATIONS: Destination[] = [
     bestSeason: 'Dec – April (Skiing) or July – Sept (Hiking)',
     visaRequirement: 'Schengen Visa regulations apply',
     tags: ['Alpine', 'Skiing', 'Luxury', 'Scenic Trains'],
-    highlights: ['Gornergrat Cogwheel Railway', 'Matterhorn Glacier Paradise 3,883m', 'Five Lakes Alpine Hike (5-Seenweg)', 'Fondue Chalet Dining in Findeln'],
-    weather: { temp: 2, condition: 'Snowy Peak', icon: 'CloudSnow', humidity: 65 },
+    highlights: [
+      'Gornergrat Cogwheel Railway',
+      'Matterhorn Glacier Paradise 3,883m',
+      'Five Lakes Alpine Hike (5-Seenweg)',
+      'Fondue Chalet Dining in Findeln',
+    ],
+    weather: {
+      temp: 2,
+      condition: 'Snowy Peak',
+      icon: 'CloudSnow',
+      humidity: 65,
+    },
   },
   {
     id: 'cairo-egypt',
@@ -114,7 +159,8 @@ export const DESTINATIONS: Destination[] = [
     region: 'Middle East & Africa',
     category: 'Cultural Heritage',
     tagline: 'Colossal ancient wonders, Nile feluccas & bustling bazaars',
-    description: 'Immerse in the timeless cradle of civilization with the Great Pyramids of Giza, the newly opened Grand Egyptian Museum, and twilight cruises on the Nile.',
+    description:
+      'Immerse in the timeless cradle of civilization with the Great Pyramids of Giza, the newly opened Grand Egyptian Museum, and twilight cruises on the Nile.',
     heroImage: '/images/cairo.jpg',
     galleryImages: [
       'https://images.unsplash.com/photo-1503177119275-0aa32b3a9368?auto=format&fit=crop&w=800&q=80',
@@ -129,7 +175,12 @@ export const DESTINATIONS: Destination[] = [
     bestSeason: 'October – April (Mild weather)',
     visaRequirement: 'e-Visa available online (30 days)',
     tags: ['History', 'Pyramids', 'Nile Cruise', 'Archaeology'],
-    highlights: ['Great Pyramid of Khufu & Sphinx', 'Grand Egyptian Museum (GEM)', 'Khan el-Khalili 14th-century Bazaar', 'Sunset Felucca Sailing on the Nile'],
+    highlights: [
+      'Great Pyramid of Khufu & Sphinx',
+      'Grand Egyptian Museum (GEM)',
+      'Khan el-Khalili 14th-century Bazaar',
+      'Sunset Felucca Sailing on the Nile',
+    ],
     weather: { temp: 26, condition: 'Sunny & Warm', icon: 'Sun', humidity: 38 },
   },
   {
@@ -139,7 +190,8 @@ export const DESTINATIONS: Destination[] = [
     region: 'North America',
     category: 'Alpine Escapes',
     tagline: 'Electric turquoise glacial lakes framed by the Canadian Rockies',
-    description: 'Surreal glacier-fed turquoise waters, towering pine forests, thermal springs, and scenic wildlife sightings along the world-famous Icefields Parkway.',
+    description:
+      'Surreal glacier-fed turquoise waters, towering pine forests, thermal springs, and scenic wildlife sightings along the world-famous Icefields Parkway.',
     heroImage: '/images/banff.jpg',
     galleryImages: [
       'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80',
@@ -154,8 +206,18 @@ export const DESTINATIONS: Destination[] = [
     bestSeason: 'June – Sept (Lakes) or Dec – March (Skiing)',
     visaRequirement: 'eTA required for visa-exempt foreign nationals',
     tags: ['Glacial Lakes', 'Hiking', 'Canoeing', 'Wildlife'],
-    highlights: ['Moraine Lake & Lake Louise Canoeing', 'Peyto Lake Wolf-Shaped Panorama', 'Banff Upper Hot Springs Soak', 'Icefields Parkway Glacier Skywalk'],
-    weather: { temp: 12, condition: 'Crisp & Sunny', icon: 'Sun', humidity: 45 },
+    highlights: [
+      'Moraine Lake & Lake Louise Canoeing',
+      'Peyto Lake Wolf-Shaped Panorama',
+      'Banff Upper Hot Springs Soak',
+      'Icefields Parkway Glacier Skywalk',
+    ],
+    weather: {
+      temp: 12,
+      condition: 'Crisp & Sunny',
+      icon: 'Sun',
+      humidity: 45,
+    },
   },
   {
     id: 'amalfi-italy',
@@ -164,7 +226,8 @@ export const DESTINATIONS: Destination[] = [
     region: 'Europe',
     category: 'Trending',
     tagline: 'Pastel cliffside villas cascading into the azure Tyrrhenian Sea',
-    description: 'Dramatic vertical cliffs dressed in pastel villas, fragrant lemon groves, cliffside trattorias, and yacht cruises navigating the crystalline waters of Capri.',
+    description:
+      'Dramatic vertical cliffs dressed in pastel villas, fragrant lemon groves, cliffside trattorias, and yacht cruises navigating the crystalline waters of Capri.',
     heroImage: '/images/amalfi.jpg',
     galleryImages: [
       'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&w=800&q=80',
@@ -179,8 +242,18 @@ export const DESTINATIONS: Destination[] = [
     bestSeason: 'May – June & September (Avoid peak August)',
     visaRequirement: 'Schengen Visa regulations apply',
     tags: ['Coastal', 'Romance', 'Fine Dining', 'Scenic Drive'],
-    highlights: ['Path of the Gods (Sentiero degli Dei)', 'Private Speedboat to Capri Blue Grotto', 'Sunset Limoncello in Positano', 'Ravello Villa Rufolo Cliffside Gardens'],
-    weather: { temp: 24, condition: 'Mediterranean Breeze', icon: 'Sun', humidity: 60 },
+    highlights: [
+      'Path of the Gods (Sentiero degli Dei)',
+      'Private Speedboat to Capri Blue Grotto',
+      'Sunset Limoncello in Positano',
+      'Ravello Villa Rufolo Cliffside Gardens',
+    ],
+    weather: {
+      temp: 24,
+      condition: 'Mediterranean Breeze',
+      icon: 'Sun',
+      humidity: 60,
+    },
   },
 ];
 
@@ -234,7 +307,7 @@ export const INITIAL_TRIPS: Trip[] = [
             time: '20:30',
             title: 'Wagyu Omakase & Craft Highballs in Nonbei Yokocho',
             category: 'food',
-            locationName: 'Nonbei Yokocho (Drunkard\'s Alley)',
+            locationName: "Nonbei Yokocho (Drunkard's Alley)",
             lat: 35.6601,
             lng: 139.7021,
             cost: 120,
@@ -319,8 +392,10 @@ export const INITIAL_VOTING_CARDS: VotingCard[] = [
     tripId: 'trip-japan-2026',
     title: 'Helicopter Night Flight over Tokyo Tower',
     type: 'Activity',
-    photo: 'https://images.unsplash.com/photo-1542051841857-5f90071e7989?auto=format&fit=crop&w=600&q=80',
-    description: '15-minute panoramic night cruise hovering over Roppongi and Rainbow Bridge lights.',
+    photo:
+      'https://images.unsplash.com/photo-1542051841857-5f90071e7989?auto=format&fit=crop&w=600&q=80',
+    description:
+      '15-minute panoramic night cruise hovering over Roppongi and Rainbow Bridge lights.',
     costEst: 185,
     votesUp: 4,
     votesDown: 0,
@@ -331,8 +406,10 @@ export const INITIAL_VOTING_CARDS: VotingCard[] = [
     tripId: 'trip-japan-2026',
     title: 'Midnight Ramen & Speakeasy Tour in Shinjuku',
     type: 'Dining',
-    photo: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80',
-    description: 'Explore Golden Gai hidden alley bars and artisanal tonkotsu broth masters.',
+    photo:
+      'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=600&q=80',
+    description:
+      'Explore Golden Gai hidden alley bars and artisanal tonkotsu broth masters.',
     costEst: 65,
     votesUp: 5,
     votesDown: 1,
@@ -344,7 +421,8 @@ export const INITIAL_VOTING_CARDS: VotingCard[] = [
     title: 'Traditional Onsen Ryokan Night in Hakone',
     type: 'Lodging',
     photo: '/images/tokyo.jpg',
-    description: 'Cedar-wood private hot spring bath with view of Mt Fuji and multi-course Kaiseki dinner.',
+    description:
+      'Cedar-wood private hot spring bath with view of Mt Fuji and multi-course Kaiseki dinner.',
     costEst: 340,
     votesUp: 6,
     votesDown: 0,
@@ -352,6 +430,18 @@ export const INITIAL_VOTING_CARDS: VotingCard[] = [
 ];
 
 export const EMERGENCY_DB: Record<string, EmergencyInfo> = {
+  India: {
+    country: 'India',
+    police: '112',
+    ambulance: '112',
+    fire: '112',
+    emergencyGeneral: '112',
+    embassySupport:
+      'Use your embassy’s official website for current consular contacts.',
+    hospital:
+      'Ask emergency dispatch for the appropriate nearby medical facility.',
+    tip: 'For an emergency, call 112 and share your location clearly. Official information: 112.gov.in/faq.',
+  },
   Japan: {
     country: 'Japan',
     police: '110',
@@ -359,7 +449,8 @@ export const EMERGENCY_DB: Record<string, EmergencyInfo> = {
     fire: '119',
     emergencyGeneral: '110',
     embassySupport: '+81 3-3224-5000 (US) / +81 3-5275-3220 (UK)',
-    hospital: 'St. Luke’s International Hospital (English spoken): 03-3541-5151',
+    hospital:
+      'St. Luke’s International Hospital (English spoken): 03-3541-5151',
     tip: 'Medical calls can ask for an English translator immediately by saying "English please".',
   },
   Iceland: {
@@ -395,14 +486,70 @@ export const EMERGENCY_DB: Record<string, EmergencyInfo> = {
 };
 
 export const INITIAL_PACKING_LIST: PackingItem[] = [
-  { id: 'p1', category: 'Documents', name: 'Passport (6+ months validity remaining)', checked: true, important: true },
-  { id: 'p2', category: 'Documents', name: 'International Driving Permit (IDP)', checked: false, important: true },
-  { id: 'p3', category: 'Documents', name: 'Travel Insurance policy PDF (offline saved)', checked: true, important: true },
-  { id: 'p4', category: 'Essentials', name: 'Universal Travel Adapter (with Type A/C/G)', checked: false, important: true },
-  { id: 'p5', category: 'Essentials', name: 'Noise-cancelling headphones', checked: true },
-  { id: 'p6', category: 'Tech & Gear', name: 'High-capacity 20,000mAh Power Bank', checked: true, important: true },
-  { id: 'p7', category: 'Tech & Gear', name: 'Dual eSIM profile activated', checked: false },
-  { id: 'p8', category: 'Medical', name: 'Prescription meds with original prescription doctor note', checked: true, important: true },
-  { id: 'p9', category: 'Medical', name: 'Electrolyte hydration packets & Motion sickness tablets', checked: false },
-  { id: 'p10', category: 'Clothing', name: 'Thermal base layers & Merino wool socks', checked: false },
+  {
+    id: 'p1',
+    category: 'Documents',
+    name: 'Passport (6+ months validity remaining)',
+    checked: true,
+    important: true,
+  },
+  {
+    id: 'p2',
+    category: 'Documents',
+    name: 'International Driving Permit (IDP)',
+    checked: false,
+    important: true,
+  },
+  {
+    id: 'p3',
+    category: 'Documents',
+    name: 'Travel Insurance policy PDF (offline saved)',
+    checked: true,
+    important: true,
+  },
+  {
+    id: 'p4',
+    category: 'Essentials',
+    name: 'Universal Travel Adapter (with Type A/C/G)',
+    checked: false,
+    important: true,
+  },
+  {
+    id: 'p5',
+    category: 'Essentials',
+    name: 'Noise-cancelling headphones',
+    checked: true,
+  },
+  {
+    id: 'p6',
+    category: 'Tech & Gear',
+    name: 'High-capacity 20,000mAh Power Bank',
+    checked: true,
+    important: true,
+  },
+  {
+    id: 'p7',
+    category: 'Tech & Gear',
+    name: 'Dual eSIM profile activated',
+    checked: false,
+  },
+  {
+    id: 'p8',
+    category: 'Medical',
+    name: 'Prescription meds with original prescription doctor note',
+    checked: true,
+    important: true,
+  },
+  {
+    id: 'p9',
+    category: 'Medical',
+    name: 'Electrolyte hydration packets & Motion sickness tablets',
+    checked: false,
+  },
+  {
+    id: 'p10',
+    category: 'Clothing',
+    name: 'Thermal base layers & Merino wool socks',
+    checked: false,
+  },
 ];

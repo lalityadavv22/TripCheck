@@ -21,7 +21,7 @@ export const OfflineSurvivalView: React.FC<{
   country: string;
 }> = ({ tripId, country }) => {
   const [selectedCountry, setSelectedCountry] = useState<string>(
-    EMERGENCY_DB[country] ? country : 'Japan'
+    EMERGENCY_DB[country] ? country : '__other'
   );
   const [packingItems, setPackingItems] = useLocalStorage<PackingItem[]>(
     `packing:${tripId}`,
@@ -50,8 +50,17 @@ export const OfflineSurvivalView: React.FC<{
     ((parseFloat(calcAmount) || 0) / exchangeRates[fromCurrency]) *
     exchangeRates[toCurrency];
 
-  const currentEmergency: EmergencyInfo =
-    EMERGENCY_DB[selectedCountry] || EMERGENCY_DB['Japan'];
+  const currentEmergency: EmergencyInfo = EMERGENCY_DB[selectedCountry] || {
+    country,
+    police: '',
+    ambulance: '',
+    fire: '',
+    emergencyGeneral: '',
+    embassySupport: 'Check your embassy’s official website before you travel.',
+    hospital:
+      'Ask your accommodation or local authorities for the nearest appropriate facility.',
+    tip: 'We don’t have emergency numbers for this country. Check official local guidance and save the numbers before traveling.',
+  };
 
   const togglePackingItem = (id: string) => {
     setPackingItems((prev) =>
@@ -103,10 +112,12 @@ export const OfflineSurvivalView: React.FC<{
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-slate-400">Country:</span>
           <select
+            aria-label="Emergency country"
             value={selectedCountry}
             onChange={(e) => setSelectedCountry(e.target.value)}
             className="px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-white focus:outline-none focus:border-cyan-500"
           >
+            <option value="__other">Other country — check locally</option>
             {Object.keys(EMERGENCY_DB).map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -116,6 +127,16 @@ export const OfflineSurvivalView: React.FC<{
         </div>
       </div>
 
+      {selectedCountry === 'India' && (
+        <a
+          href="https://112.gov.in/faq"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="google-maps-link"
+        >
+          Official India emergency information ↗
+        </a>
+      )}
       {/* Emergency Hotline Matrix */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-rose-50/30 border border-rose-200/50 shadow-lg">
@@ -124,9 +145,13 @@ export const OfflineSurvivalView: React.FC<{
             <span>Police</span>
           </div>
           <div className="text-3xl font-black text-rose-700 font-mono">
-            <a href={`tel:${currentEmergency.police}`}>
-              {currentEmergency.police}
-            </a>
+            {currentEmergency.police ? (
+              <a href={`tel:${currentEmergency.police}`}>
+                {currentEmergency.police}
+              </a>
+            ) : (
+              <span className="text-sm">Check locally</span>
+            )}
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
             Local emergency dispatch
@@ -139,9 +164,13 @@ export const OfflineSurvivalView: React.FC<{
             <span>Ambulance</span>
           </div>
           <div className="text-3xl font-black text-amber-700 font-mono">
-            <a href={`tel:${currentEmergency.ambulance}`}>
-              {currentEmergency.ambulance}
-            </a>
+            {currentEmergency.ambulance ? (
+              <a href={`tel:${currentEmergency.ambulance}`}>
+                {currentEmergency.ambulance}
+              </a>
+            ) : (
+              <span className="text-sm">Check locally</span>
+            )}
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
             Medical response
@@ -154,7 +183,13 @@ export const OfflineSurvivalView: React.FC<{
             <span>Fire Rescue</span>
           </div>
           <div className="text-3xl font-black text-orange-700 font-mono">
-            <a href={`tel:${currentEmergency.fire}`}>{currentEmergency.fire}</a>
+            {currentEmergency.fire ? (
+              <a href={`tel:${currentEmergency.fire}`}>
+                {currentEmergency.fire}
+              </a>
+            ) : (
+              <span className="text-sm">Check locally</span>
+            )}
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
             Fire & rescue squads
@@ -167,9 +202,13 @@ export const OfflineSurvivalView: React.FC<{
             <span>Emergency line</span>
           </div>
           <div className="text-3xl font-black text-cyan-700 font-mono">
-            <a href={`tel:${currentEmergency.emergencyGeneral}`}>
-              {currentEmergency.emergencyGeneral}
-            </a>
+            {currentEmergency.emergencyGeneral ? (
+              <a href={`tel:${currentEmergency.emergencyGeneral}`}>
+                {currentEmergency.emergencyGeneral}
+              </a>
+            ) : (
+              <span className="text-sm">Check locally</span>
+            )}
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
             Local emergency reference

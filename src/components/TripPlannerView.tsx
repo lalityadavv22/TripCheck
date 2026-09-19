@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import { dateAfter } from '../utils/trip';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trip, ActivityItem, ItineraryDay } from '../types';
-import { InteractiveMap } from './InteractiveMap';
-import { HighRes2DRouteMap } from './HighRes2DRouteMap';
+import { GoogleMapsLink, GoogleMapsCard } from './GoogleMapsLink';
 import {
   Calendar,
   Clock,
@@ -20,9 +19,7 @@ import {
   Bed,
   Utensils,
   Camera,
-  Layers,
   Sparkles,
-  Map as MapIcon,
 } from 'lucide-react';
 
 interface TripPlannerViewProps {
@@ -41,8 +38,6 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
   const dialogRef = useDialog(showAddActivityModal, () =>
     setShowAddActivityModal(false)
   );
-  const [showMap, setShowMap] = useState(true);
-  const [mapEngine, setMapEngine] = useState<'mapbox' | 'leaflet'>('mapbox');
 
   // New activity state
   const [newTitle, setNewTitle] = useState('');
@@ -94,7 +89,7 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
       title: newTitle.trim(),
       time: newTime,
       category: newCategory,
-      locationName: newLocation.trim() || 'Central District',
+      locationName: newLocation.trim() || newTitle.trim(),
       cost: parseFloat(newCost) || 0,
       notes: newNotes.trim(),
       isCompleted: false,
@@ -202,17 +197,7 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
                 <Sparkles className="w-4 h-4 text-purple-200" />
                 <span>Get trip ideas</span>
               </button>
-              <button
-                onClick={() => setShowMap(!showMap)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                  showMap
-                    ? 'bg-cyan-500 text-slate-950 border-cyan-400'
-                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                }`}
-              >
-                <Layers className="w-4 h-4" />
-                <span>{showMap ? 'Hide Map' : 'Show Map'}</span>
-              </button>
+              <GoogleMapsLink place={trip.destination} />
             </div>
           </div>
         </div>
@@ -246,7 +231,7 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
         </div>
       </div>
 
-      {/* Main Two-Column Layout (Days & Schedule / Interactive Map) */}
+      {/* Schedule and Google Maps links */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Schedule & Days Column (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
@@ -411,81 +396,28 @@ export const TripPlannerView: React.FC<TripPlannerViewProps> = ({
           )}
         </div>
 
-        {/* Right Map Column (5 cols) */}
-        <div className="lg:col-span-5 space-y-2">
-          {/* Map Header */}
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-xl bg-cyan-500/20 text-cyan-300 font-extrabold text-[11px] border border-cyan-500/30 flex items-center gap-1.5">
-                <Compass className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Your day on the map</span>
-              </span>
-            </div>
-
-            <button
-              onClick={() => setShowMap(!showMap)}
-              className="text-xs text-slate-400 hover:text-white cursor-pointer px-2 py-1 rounded-lg hover:bg-slate-800"
-            >
-              {showMap ? 'Hide Map' : 'Show Map'}
-            </button>
-          </div>
-
-          {showMap ? (
-            <div className="sticky top-20 h-[520px]">
-              {!currentDay?.activities.some(
-                (a) => Number.isFinite(a.lat) && Number.isFinite(a.lng)
-              ) ? (
-                <div className="empty-state">
-                  <MapPin size={24} />
-                  <h3>No mapped stops yet</h3>
-                  <p>
-                    Your stops are saved. Only places with known coordinates
-                    appear on the map.
-                  </p>
-                </div>
-              ) : (
-                <HighRes2DRouteMap
-                  destCoords={{
-                    lat:
-                      currentDay?.activities.find((a) => Number.isFinite(a.lat))
-                        ?.lat ?? 20,
-                    lng:
-                      currentDay?.activities.find((a) => Number.isFinite(a.lng))
-                        ?.lng ?? 0,
-                  }}
-                  destName={trip.destination}
-                  points={(currentDay?.activities || [])
-                    .filter(
-                      (a) => Number.isFinite(a.lat) && Number.isFinite(a.lng)
-                    )
-                    .map((a, idx) => ({
-                      id: a.id,
-                      title: a.title,
-                      lat: a.lat,
-                      lng: a.lng,
-                      category: a.category,
-                      time: a.time,
-                      cost: a.cost,
-                      description: a.notes,
-                    }))}
-                  className="h-full"
-                  defaultLayer="voyager"
+        <aside className="lg:col-span-5 space-y-4">
+          <GoogleMapsCard destination={trip.destination} />
+          <div className="trip-place-links">
+            <h3>Day {currentDay?.dayNumber || 1}: your places</h3>
+            <p>
+              Open a stop in Google Maps to check the details before heading
+              out.
+            </p>
+            {(currentDay?.activities || []).map((activity) => (
+              <div key={activity.id}>
+                <strong>{activity.title}</strong>
+                <GoogleMapsLink
+                  place={`${activity.locationName || activity.title}, ${trip.destination}`}
+                  label="View place"
                 />
-              )}
-            </div>
-          ) : (
-            <div className="p-8 rounded-3xl border border-dashed border-slate-800 bg-slate-900/30 text-center flex flex-col items-center justify-center h-64">
-              <Navigation className="w-8 h-8 text-slate-600 mb-2" />
-              <p className="text-sm text-slate-400">Map view is hidden</p>
-              <button
-                onClick={() => setShowMap(true)}
-                className="mt-3 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-cyan-400 transition"
-              >
-                Enable Map
-              </button>
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+            {!currentDay?.activities.length && (
+              <p>Add a stop to see its Google Maps link here.</p>
+            )}
+          </div>
+        </aside>
       </div>
 
       {/* Add Activity Modal */}

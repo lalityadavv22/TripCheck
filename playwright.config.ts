@@ -2,7 +2,8 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
-  workers: 2,
+  // The optional sandbox Chromium uses software rendering; avoid GPU contention.
+  workers: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? 1 : 2,
   timeout: 90000,
   expect: { timeout: 7000 },
   reporter: [['list'], ['html', { open: 'never' }]],

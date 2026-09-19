@@ -1,3 +1,4 @@
+import { GoogleMapsLink } from './GoogleMapsLink';
 import { isGeneratedTripPlan } from '../utils/validation';
 import { useDialog } from '../hooks/useDialog';
 import React, { useState, useEffect } from 'react';
@@ -282,6 +283,7 @@ export const AIArchitectModal: React.FC<AIArchitectModalProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-purple-400" />
                 <span>{generatedPlan.title}</span>
               </h4>
+              <GoogleMapsLink place={generatedPlan.destination} />
               <p className="text-xs text-slate-300">{generatedPlan.summary}</p>
             </div>
 

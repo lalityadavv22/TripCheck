@@ -1,5 +1,18 @@
 > **Current checkout:** the runnable app here is the React + Express TripCheck planner in `src/` and `server.ts`. Start with `npm ci && npm run dev` (Node 22+). See [verification and current limitations](docs/TESTING.md) for the tested features and commands. The upstream TREK documentation below describes a broader product; it is not a feature guarantee for this checkout.
 
+## Current TripCheck experience
+
+- Full-screen destination discovery, local saved places, itinerary, budget, packing and group ideas.
+- **Google Maps links instead of embedded maps**: open the actual destination, individual stop or origin-to-destination directions.
+- **Worldwide place search**, including Gurugram/Gurgaon/Hindi aliases, a server-side 135k+ city/town index, live village/landmark search, and a Google Maps fallback for any typed name. [Coverage, setup and attribution](docs/PLACE_SEARCH.md).
+- **Cursor glow** with hover/press feedback and a persistent on/off switch. Native pointer stays visible; effects are disabled on touch and with reduced motion.
+- `GEMINI_API_KEY` enables live AI planning; without it, plans are clearly labeled samples. `GEOAPIFY_API_KEY` optionally enables a second geocoder. Both keys are server-only. Copy `.env.example` to `.env` for local configuration; production uses `npm run build` then `NODE_ENV=production npm start`.
+
+For tested behavior and remaining limitations, see [the verification report](docs/TESTING.md).
+
+---
+**Upstream TREK reference (not this checkout’s implemented feature list):**
+
 <div align="center">
 
 <picture>

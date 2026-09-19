@@ -96,28 +96,27 @@ test('search, empty state, destination tabs, Escape and shared destination link'
   ).toBeVisible();
 });
 
-test('map layers, bounds, fullscreen dimensions, Escape and external tile failure', async ({
+test('destination links open Google Maps and embedded maps are absent', async ({
   page,
 }) => {
-  await page.route(/.*(cartocdn|arcgisonline|tile.openstreetmap).*/, (route) =>
-    route.abort()
+  const card = page
+    .locator('.destination-card')
+    .filter({ has: page.getByRole('button', { name: 'Tokyo', exact: true }) });
+  const link = card.getByRole('link', { name: /Open Google Maps/ });
+  await expect(link).toHaveAttribute('target', '_blank');
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  const url = new URL((await link.getAttribute('href'))!);
+  expect(url.origin).toBe('https://www.google.com');
+  expect(url.searchParams.get('query')).toBe('Tokyo, Japan');
+  await page
+    .getByRole('button', { name: 'Explore Tokyo', exact: true })
+    .click();
+  await expect(
+    page.getByRole('dialog').getByRole('link', { name: /Open Google Maps/ })
+  ).toHaveAttribute('href', /google.com\/maps\/search/);
+  await expect(page.locator('.leaflet-container, canvas, iframe')).toHaveCount(
+    0
   );
-  await page.getByRole('button', { name: 'Map', exact: true }).click();
-  await expect(page.locator('.leaflet-container')).toBeVisible();
-  await page.getByRole('button', { name: 'Dark', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: 'Dark', exact: true })
-  ).toHaveAttribute('aria-pressed', 'true');
-  await page.getByTitle('Fit Full Route').click();
-  await page.getByTitle('Expand Fullscreen').click();
-  const box = await page.locator('.map-fullscreen').boundingBox();
-  expect(box?.width).toBeGreaterThan(1400);
-  expect(box?.height).toBeGreaterThan(960);
-  await expect(
-    page.getByText('Map tiles couldn’t load.', { exact: false })
-  ).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.map-fullscreen')).toHaveCount(0);
 });
 
 test('create blank destination trip, add day and activity, complete, persist, delete', async ({
@@ -140,7 +139,7 @@ test('create blank destination trip, add day and activity, complete, persist, de
   await dialog.locator('input[type="number"]').fill('12.50');
   await dialog.locator('button[type="submit"]').click();
   await expect(
-    page.getByText('A quiet coffee stop', { exact: true })
+    page.getByRole('heading', { name: 'A quiet coffee stop', exact: true })
   ).toBeVisible();
   await page
     .getByRole('button', { name: 'Mark complete: A quiet coffee stop' })
@@ -159,7 +158,7 @@ test('create blank destination trip, add day and activity, complete, persist, de
   expect(trip.days[7].activities[0].lat).toBeUndefined();
   await page.getByTitle('Delete activity').click();
   await expect(
-    page.getByText('A quiet coffee stop', { exact: true })
+    page.getByRole('heading', { name: 'A quiet coffee stop', exact: true })
   ).toHaveCount(0);
 });
 
@@ -514,44 +513,303 @@ test('mobile dialogs and generated results fit the screen and can be dismissed',
   ).toBe(true);
 });
 
-test('planner map visibility and empty day selection work independently', async ({
+test('planner Google Maps links follow the active destination and day', async ({
   page,
 }) => {
   await nav(page, 'My itinerary');
-  await expect(page.locator('.leaflet-container')).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Hide Map', exact: true })
-    .first()
-    .click();
-  await expect(page.locator('.leaflet-container')).toHaveCount(0);
-  await page
-    .getByRole('button', { name: 'Show Map', exact: true })
-    .first()
-    .click();
-  await expect(page.locator('.leaflet-container')).toBeVisible();
+  await expect(
+    page
+      .locator('.google-maps-card')
+      .getByRole('link', { name: /Get directions/ })
+  ).toBeVisible();
+  expect(await page.locator('.trip-place-links a').count()).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Add Day', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'No mapped stops yet' })
+    page.getByText('Add a stop to see its Google Maps link here.')
   ).toBeVisible();
+  await expect(page.locator('.trip-place-links a')).toHaveCount(0);
+  await expect(page.locator('.leaflet-container, canvas, iframe')).toHaveCount(
+    0
+  );
 });
 
-test('map popup treats activity names as text, not executable HTML', async ({
+test('activity links safely encode place names instead of interpreting HTML', async ({
   page,
 }) => {
   await page.evaluate(() => {
     const trip = JSON.parse(localStorage.getItem('tripcheck:active-trip')!);
-    trip.days[0].activities[0].title =
-      '<img src=x onerror="window.popupInjected=true">';
+    trip.days[0].activities[0].locationName =
+      '<img src=x onerror="window.popupInjected=true"> & cafe';
     localStorage.setItem('tripcheck:active-trip', JSON.stringify(trip));
   });
   await page.reload();
   await nav(page, 'My itinerary');
-  await page.locator('.activity-pin').first().click();
-  await expect(page.locator('.leaflet-popup-content')).toContainText(
-    '<img src=x'
+  const url = new URL(
+    (await page.locator('.trip-place-links a').first().getAttribute('href'))!
   );
+  expect(url.origin).toBe('https://www.google.com');
+  expect(url.searchParams.get('query')).toContain('<img src=x');
   expect(
     await page.evaluate(() => (window as any).popupInjected)
   ).toBeUndefined();
-  await nav(page, 'Explore');
+});
+
+test('header search finds Gurugram/Gurgaon and hands the exact selection to the planner', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Find a destination' }).click();
+  await page.getByLabel('Search destinations').fill('Gurgaon');
+  const result = page
+    .locator('.worldwide-place')
+    .filter({ has: page.getByText('Gurugram', { exact: true }) });
+  await expect(result).toBeVisible();
+  const link = new URL((await result.getByRole('link').getAttribute('href'))!);
+  expect(link.searchParams.get('query')).toBe(
+    'Gurugram (Gurgaon), Haryana, India'
+  );
+  await result.getByRole('button', { name: /Plan a trip/ }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'Plan your trip' })
+  ).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('#dest-place-input')).toHaveValue(
+    'Gurugram (Gurgaon), Haryana, India'
+  );
+  const submitted = page.waitForRequest(
+    (r) => r.url().endsWith('/api/ai/plan') && r.method() === 'POST'
+  );
+  await page
+    .getByRole('button', { name: 'Generate Trip', exact: true })
+    .click();
+  expect((await submitted).postDataJSON().destCoords).toEqual({
+    lat: 28.4595,
+    lng: 77.0266,
+  });
+  await expect(page.getByRole('status')).toContainText('Sample plan');
+  await expect(
+    page
+      .locator('.google-maps-card')
+      .getByRole('link', { name: /Open Google Maps/ })
+  ).toHaveAttribute('href', /Gurugram/);
+});
+
+test('autocomplete finds a small place, supports arrows, selection and clearing', async ({
+  page,
+}) => {
+  const input = page.locator('#quick-dest-input');
+  await input.fill('Sohna');
+  await expect(
+    page.getByRole('option', { name: /Sohna/ }).first()
+  ).toBeVisible();
+  await input.press('ArrowDown');
+  await input.press('Enter');
+  await expect(input).toHaveValue('Sohna, Gurugram, Haryana, India');
+  await page
+    .getByRole('button', { name: 'Clear destination', exact: true })
+    .click();
+  await expect(input).toHaveValue('');
+});
+
+test('unknown places still have a direct Google Maps search when providers are offline', async ({
+  page,
+}) => {
+  await page.route('**/api/places/autocomplete?*', (r) => r.abort());
+  await page.getByRole('button', { name: 'Find a destination' }).click();
+  const name = 'Small hamlet near Chamba & café';
+  await page.getByLabel('Search destinations').fill(name);
+  await expect(
+    page.getByText('Live place search is unavailable.', { exact: false })
+  ).toBeVisible();
+  const link = page.getByRole('link', {
+    name: /Search this name on Google Maps/,
+  });
+  expect(
+    new URL((await link.getAttribute('href'))!).searchParams.get('query')
+  ).toBe(name);
+});
+
+test('global results support villages returned by the live search contract', async ({
+  page,
+}) => {
+  await page.route('**/api/places/autocomplete?*', (r) =>
+    r.fulfill({
+      json: {
+        success: true,
+        source: 'live',
+        places: [
+          {
+            id: 'v1',
+            name: 'Test Hamlet',
+            label: 'Test Hamlet, Chamba, India',
+            type: 'village',
+            lat: 32,
+            lng: 76,
+          },
+        ],
+        attribution: '© OpenStreetMap contributors',
+        notice: '',
+      },
+    })
+  );
+  await page.getByRole('button', { name: 'Find a destination' }).click();
+  await page.getByLabel('Search destinations').fill('Test Hamlet');
+  await expect(page.locator('.worldwide-place')).toContainText(
+    'Test Hamlet, Chamba, India'
+  );
+  await page
+    .getByRole('button', { name: 'Plan a trip to Test Hamlet, Chamba, India' })
+    .click();
+  await expect(page.locator('#dest-place-input')).toHaveValue(
+    'Test Hamlet, Chamba, India'
+  );
+});
+
+test('cursor halo follows pointer, grows on controls and never blocks clicks', async ({
+  page,
+}) => {
+  await page.mouse.move(500, 110);
+  const aura = page.locator('.cursor-aura');
+  await expect(aura).toHaveAttribute('data-visible', 'true');
+  await expect(aura).toHaveCSS('pointer-events', 'none');
+  await page.getByRole('button', { name: 'Find a destination' }).hover();
+  await expect(aura).toHaveAttribute('data-interactive', 'true');
+  await page.getByRole('button', { name: 'Find a destination' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('switch', { name: 'Cursor glow' }).click();
+  await expect(aura).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByRole('switch', { name: 'Cursor glow' })
+  ).toHaveAttribute('aria-checked', 'false');
+});
+
+test('cursor respects reduced motion and keyboard navigation', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.mouse.move(600, 200);
+  await expect(page.locator('.cursor-aura')).toBeHidden();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.mouse.move(610, 200);
+  await expect(page.locator('.cursor-aura')).toHaveAttribute(
+    'data-visible',
+    'true'
+  );
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.cursor-aura')).toHaveAttribute(
+    'data-visible',
+    'false'
+  );
+});
+
+test('mobile global search and new Maps cards fit without horizontal overflow', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.getByRole('button', { name: 'Find a destination' }).click();
+  await page.getByLabel('Search destinations').fill('Gurugram');
+  await expect(page.locator('.worldwide-place').first()).toBeVisible();
+  expect(
+    await page
+      .getByRole('dialog')
+      .evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
+  ).toBe(true);
+  await page.getByLabel('Close search').click();
+  await nav(page, 'My itinerary');
+  expect(
+    await page
+      .locator('.google-maps-card')
+      .evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
+  ).toBe(true);
+  await noOverflow(page);
+});
+
+test('all inspiration filters return matching places and recover to all', async ({
+  page,
+}) => {
+  for (const [name, count] of [
+    ['Beaches & islands', 1],
+    ['Mountains', 2],
+    ['City breaks', 1],
+    ['Nature', 1],
+    ['Culture & history', 1],
+  ] as const) {
+    await page.getByRole('button', { name, exact: true }).click();
+    await expect(page.locator('.destination-card')).toHaveCount(count);
+  }
+  await page.getByRole('button', { name: 'All places', exact: true }).click();
+  await expect(page.locator('.destination-card')).toHaveCount(7);
+});
+
+test('Google Maps directions use the generated origin and destination', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Plan my trip', exact: true }).click();
+  await page.locator('#origin-place-input').fill('Rohtak');
+  await page.locator('#dest-place-input').fill('Gurgaon');
+  await page
+    .getByRole('button', { name: 'Generate Trip', exact: true })
+    .click();
+  await expect(page.getByRole('status')).toContainText('Sample plan');
+  const href = await page
+    .locator('.google-maps-card')
+    .getByRole('link', { name: /Get directions/ })
+    .getAttribute('href');
+  const url = new URL(href!);
+  expect(url.searchParams.get('origin')).toBe('Rohtak');
+  expect(url.searchParams.get('destination')).toBe('Gurgaon');
+});
+
+test('currency country guard never shows Japanese emergency numbers for an unsupported destination', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const trip = JSON.parse(localStorage.getItem('tripcheck:active-trip')!);
+    trip.country = 'Unlisted country';
+    localStorage.setItem('tripcheck:active-trip', JSON.stringify(trip));
+  });
+  await page.reload();
+  await nav(page, 'Travel essentials');
+  await expect(page.getByLabel('Emergency country')).toHaveValue('__other');
+  await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
+  await page.getByLabel('Emergency country').selectOption('India');
+  await expect(page.locator('a[href="tel:112"]')).toHaveCount(4);
+});
+
+test('destination highlights and share failure are clear and recoverable', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('denied')) },
+    });
+  });
+  await page
+    .getByRole('button', { name: 'Explore Tokyo', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Curated Highlights', exact: true })
+    .click();
+  await expect(page.getByRole('dialog')).toContainText('Shibuya');
+  await page.getByTitle('Share', { exact: true }).click();
+  await expect(page.getByRole('status')).toContainText(
+    'Couldn’t copy automatically'
+  );
+  await expect(page.getByRole('status')).toContainText(
+    'destination=tokyo-japan'
+  );
+});
+
+test('offline city index finds locations outside the featured and curated lists', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Find a destination' }).click();
+  await page.getByLabel('Search destinations').fill('Albuquerque');
+  await expect(page.locator('.worldwide-place').first()).toContainText(
+    'Albuquerque'
+  );
+  await expect(page.locator('.worldwide-place').first()).toContainText(
+    'United States'
+  );
 });
