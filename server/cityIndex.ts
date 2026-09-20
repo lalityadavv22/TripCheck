@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import Pbf from 'pbf';
 import type { PlaceItem } from '../src/types';
 import { normalizePlaceQuery } from '../src/utils/places';
 
@@ -13,87 +12,25 @@ const __dirname = path.dirname(__filename);
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 const countries = new Map<string, string>();
 
-let lastLat = 0;
-let lastLon = 0;
-
-function readCity(tag: number, city: any, pbf: any) {
-  if (tag === 1) city.cityId = pbf.readSVarint();
-  else if (tag === 2) city.name = pbf.readString();
-  else if (tag === 3) city.country = pbf.readString();
-  else if (tag === 4) city.altName = pbf.readString();
-  else if (tag === 5) city.muni = pbf.readString();
-  else if (tag === 6) city.muniSub = pbf.readString();
-  else if (tag === 7) city.featureCode = pbf.readString();
-  else if (tag === 8) city.adminCode = pbf.readString();
-  else if (tag === 9) city.population = pbf.readVarint();
-  else if (tag === 10) {
-    lastLon += pbf.readSVarint();
-    city.loc.coordinates[0] = lastLon / 1e5;
-  } else if (tag === 11) {
-    lastLat += pbf.readSVarint();
-    city.loc.coordinates[1] = lastLat / 1e5;
-  }
+// Safely load cities. On Vercel, all-the-cities is marked external so its
+// __dirname inside node_modules resolves correctly to the cities.pbf file.
+// On local dev / traditional hosting, the package works as normal.
+let cities: any[] = [];
+try {
+  // Dynamic import so esbuild doesn't bundle the binary-dependent package inline.
+  // Because externalPackages marks it external in vercel.json, Vercel loads it
+  // directly from node_modules where __dirname is correct.
+  const mod = await import('all-the-cities').catch(async () => {
+    // Fallback: try loading via server-side require shim
+    const { createRequire } = await import('module');
+    const req = createRequire(import.meta.url);
+    return { default: req('all-the-cities') };
+  });
+  const raw = (mod as any).default ?? mod;
+  if (Array.isArray(raw)) cities = raw;
+} catch (err) {
+  console.warn('[TripCheck] cities index unavailable, falling back to live search providers:', (err as any)?.message);
 }
-
-function parsePbfBuffer(buffer: Buffer): any[] {
-  const pbf = new (Pbf as any)(buffer);
-  const result: any[] = [];
-  lastLat = 0;
-  lastLon = 0;
-  while (pbf.pos < pbf.length) {
-    result.push(
-      pbf.readMessage(readCity, {
-        cityId: '',
-        name: '',
-        altName: '',
-        country: '',
-        featureCode: '',
-        adminCode: '',
-        population: 0,
-        loc: { type: 'Point', coordinates: [0, 0] },
-      })
-    );
-  }
-  return result;
-}
-
-function loadCitiesSafely(): any[] {
-  const candidatePaths = [
-    path.join(__dirname, 'cities.pbf'),
-    path.join(__dirname, 'server', 'cities.pbf'),
-    path.join(process.cwd(), 'server', 'cities.pbf'),
-    path.join(process.cwd(), 'cities.pbf'),
-    path.join(process.cwd(), 'node_modules', 'all-the-cities', 'cities.pbf'),
-    path.join(__dirname, '..', 'node_modules', 'all-the-cities', 'cities.pbf'),
-  ];
-
-  for (const p of candidatePaths) {
-    try {
-      if (fs.existsSync(p)) {
-        const buffer = fs.readFileSync(p);
-        return parsePbfBuffer(buffer);
-      }
-    } catch {
-      // try next candidate path
-    }
-  }
-
-  // Next, try requiring all-the-cities directly if available
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const atc = require('all-the-cities');
-    if (Array.isArray(atc)) return atc;
-  } catch {
-    // ignore
-  }
-
-  console.warn(
-    '[TripCheck] cities.pbf could not be loaded; continuing with fallback search providers without crashing.'
-  );
-  return [];
-}
-
-const cities = loadCitiesSafely();
 
 const rows = cities.map((city: any) => {
   if (!countries.has(city.country))

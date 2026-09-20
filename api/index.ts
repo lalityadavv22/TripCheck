@@ -3,15 +3,6 @@
 // that power `npm run dev` and `npm start` serve the API on the deployed domain.
 // Static files are served by Vercel from the Vite build (dist/).
 
-// Polyfill globalThis.require BEFORE any CJS-dependent modules are used.
-// ESM static imports are hoisted and resolved first, but module-level code in
-// each imported file runs lazily — so this polyfill is safe here.
-import { createRequire } from 'module';
-if (typeof (globalThis as any).require === 'undefined') {
-  (globalThis as any).require = createRequire(import.meta.url);
-}
-
-// Static import so Vercel bundles the entire dependency tree automatically.
 import { app } from '../server/app';
 
 export default function handler(req: any, res: any) {
@@ -23,34 +14,12 @@ export default function handler(req: any, res: any) {
       req.query?.__route__ || urlObj?.searchParams.get('__route__');
 
     if (queryRoute && typeof queryRoute === 'string') {
-      const qs = urlObj?.search?.replace(
-        /(\?|&)__route__=[^&]*/,
-        ''
-      ) || '';
-      req.url = '/api/' + queryRoute.replace(/^\/+/, '') + qs;
-    } else if (
-      !req.url ||
-      req.url === '/api/index' ||
-      req.url === '/api' ||
-      req.url.startsWith('/api/index?')
-    ) {
-      // Fall back to headers Vercel sets on some runtimes
-      const original =
-        req.headers['x-matched-path'] ||
-        req.headers['x-vercel-matched-path'];
-      if (original && typeof original === 'string') {
-        req.url = original;
-      }
-    }
-
-    // Ensure the /api prefix is present for Express route matching
-    if (
-      req.url &&
-      !req.url.startsWith('/api/') &&
-      !req.url.startsWith('/api?')
-    ) {
-      req.url =
-        '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+      const cleanRoute = queryRoute.replace(/^\/+/, '');
+      // Strip the __route__ param from the query string
+      const remainingQs = urlObj?.search
+        ?.replace(/[?&]__route__=[^&]*/g, '')
+        .replace(/^&/, '?') ?? '';
+      req.url = '/api/' + cleanRoute + remainingQs;
     }
 
     return (app as any)(req, res);
