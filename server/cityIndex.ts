@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+// @ts-ignore
 import Pbf from 'pbf';
 import type { PlaceItem } from '../src/types';
 import { normalizePlaceQuery } from '../src/utils/places';

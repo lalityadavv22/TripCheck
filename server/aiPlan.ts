@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai/web';
 import { isGeneratedTripPlan } from '../src/utils/validation';
 import type { GeneratedTripPlan } from '../src/types';
 
