@@ -5,8 +5,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "node_modules/all-the-cities/**",
-      "externalPackages": ["all-the-cities", "pbf"]
+      "includeFiles": "server/cities.pbf"
     }
   },
   "rewrites": [
