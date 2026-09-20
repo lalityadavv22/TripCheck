@@ -1,5 +1,6 @@
 import { GoogleMapsLink } from './GoogleMapsLink';
 import { isGeneratedTripPlan } from '../utils/validation';
+import { parseJsonResponse } from '../utils/api';
 import { useDialog } from '../hooks/useDialog';
 import React, { useState, useEffect } from 'react';
 import {
@@ -90,7 +91,14 @@ export const AIArchitectModal: React.FC<AIArchitectModalProps> = ({
         }),
       });
 
-      const data = await res.json();
+      const data = await parseJsonResponse<{
+        success?: boolean;
+        error?: string;
+        notice?: string;
+        notes?: string[];
+        source?: 'ai' | 'sample';
+        plan?: GeneratedTripPlan;
+      }>(res);
       if (controller.signal.aborted) return;
       if (!res.ok || !isGeneratedTripPlan(data.plan))
         throw new Error(

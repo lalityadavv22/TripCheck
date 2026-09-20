@@ -11,6 +11,14 @@
 
 For tested behavior and remaining limitations, see [the verification report](docs/TESTING.md).
 
+### Run & deploy (important)
+
+The frontend and the API must be served by the same server. If you open the UI without the Express backend behind it, every `/api/*` call returns the hosting provider's 404 page instead of JSON, which used to surface as `Unexpected token 'T', "The page c"... is not valid JSON` — the UI now shows a clear message instead, but the fix is deployment, not code:
+
+- **Local:** `npm ci && npm run dev` — one server on `http://localhost:3000` serves both the UI and `/api/*`.
+- **Node hosting** (Render, Railway, Fly, a VPS): `npm run build` then `NODE_ENV=production npm start`.
+- **Vercel:** deploy the repo as-is. `vercel.json` builds the Vite frontend from `dist/` and routes `/api/*` to the Express app via the `api/index.ts` serverless function. Set `GEMINI_API_KEY` in the Vercel project settings to enable live plans (sample plans work without it).
+
 ---
 **Upstream TREK reference (not this checkout’s implemented feature list):**
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { isPlaceItem, searchLocalPlaces } from '../utils/places';
+import { parseJsonResponse } from '../utils/api';
 import type { PlaceItem } from '../types';
 
 export function usePlaceSearch(query: string, enabled = true) {
@@ -30,7 +31,12 @@ export function usePlaceSearch(query: string, enabled = true) {
             ]),
           }
         );
-        const data = await response.json();
+        const data = await parseJsonResponse<{
+          success?: boolean;
+          notice?: string;
+          attribution?: string;
+          places?: unknown[];
+        }>(response);
         if (!response.ok || !data.success || !Array.isArray(data.places))
           throw new Error('Search unavailable');
         if (controller.signal.aborted || id !== sequence.current) return;
