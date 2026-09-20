@@ -132,10 +132,11 @@ export async function processPlanRequest(planInput: any): Promise<{ status: numb
     (input.vibe !== undefined &&
       (typeof input.vibe !== 'string' || input.vibe.length > 200))
   ) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       error: 'Please select valid travel preferences.',
     });
+    return { status: resultStatus, body: resultBody };
   }
 
   const {
@@ -194,7 +195,7 @@ export async function processPlanRequest(planInput: any): Promise<{ status: numb
       }
     );
     if (outcome.status === 'ok') {
-      return res.json({
+      res.json({
         success: true,
         source: 'ai',
         model: outcome.model,
@@ -202,6 +203,7 @@ export async function processPlanRequest(planInput: any): Promise<{ status: numb
         notes: outcome.notes,
         plan: outcome.plan,
       });
+      return { status: resultStatus, body: resultBody };
     }
     console.warn(
       `Live trip generation unavailable (${outcome.model}, ${outcome.attempts} attempt(s)): ${outcome.reason}. Serving the labelled sample plan.`

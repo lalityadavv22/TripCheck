@@ -155,10 +155,10 @@ const fastOptions = {
 };
 
 test('resolveModels honours a comma separated priority list', () => {
-  expect(resolveModels('')).toEqual(['gemini-2.5-flash']);
+  expect(resolveModels('')).toEqual(['gemini-3.8-flash']);
   expect(resolveModels('gemini-2.5-pro, gemini-2.5-flash ,gemini-2.5-pro')).toEqual([
     'gemini-2.5-pro',
-    'gemini-2.5-flash',
+    'gemini-3.8-flash',
   ]);
 });
 
@@ -168,7 +168,7 @@ test('a complete model plan is returned as a live plan', async () => {
     const outcome = await generateLivePlan(REQUEST, { ...fastOptions, baseUrl: stub.url });
     expect(outcome.status).toBe('ok');
     if (outcome.status !== 'ok') return;
-    expect(outcome.model).toBe('gemini-2.5-flash');
+    expect(outcome.model).toBe('gemini-3.8-flash');
     expect(outcome.notes).toEqual([]);
     expect(isGeneratedTripPlan(outcome.plan)).toBe(true);
     expect(outcome.plan.days).toHaveLength(3);
@@ -178,7 +178,7 @@ test('a complete model plan is returned as a live plan', async () => {
 
     // The request the SDK actually sent must carry the reliability config.
     const sent = stub.calls[0];
-    expect(sent.path).toContain('models/gemini-2.5-flash:generateContent');
+    expect(sent.path).toContain('models/gemini-3.8-flash:generateContent');
     expect(sent.body.generationConfig.responseMimeType).toBe('application/json');
     expect(sent.body.generationConfig.maxOutputTokens).toBe(8192);
     expect(sent.body.generationConfig.thinkingConfig.thinkingBudget).toBe(0);

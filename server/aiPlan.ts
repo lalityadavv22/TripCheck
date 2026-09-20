@@ -22,7 +22,7 @@ export interface LivePlanRequest {
 
 export interface LivePlanOptions {
   apiKey: string;
-  /** Model ids in priority order. Defaults to `GEMINI_MODEL` or gemini-2.5-flash. */
+  /** Model ids in priority order. Defaults to `GEMINI_MODEL`, gemini-3.8-flash or gemini-3.6-flash. */
   models?: string[];
   /** Test/dev override for the Generative Language endpoint. */
   baseUrl?: string;
@@ -53,7 +53,7 @@ export type LivePlanOutcome =
       attempts: number;
     };
 
-export const DEFAULT_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_MODEL = 'gemini-3.8-flash';
 const DEFAULT_TIMEOUT_MS = 25000;
 const DEFAULT_DEADLINE_MS = 60000;
 const DEFAULT_ATTEMPTS_PER_MODEL = 2;
@@ -87,7 +87,8 @@ export function resolveModels(configured?: string): string[] {
   const list = (configured || '')
     .split(',')
     .map((model) => model.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((model) => (model === 'gemini-2.5-flash' ? 'gemini-3.8-flash' : model));
   return list.length ? [...new Set(list)] : [DEFAULT_MODEL];
 }
 
@@ -715,7 +716,9 @@ export async function generateLivePlan(
   options: LivePlanOptions
 ): Promise<LivePlanOutcome> {
   const models =
-    options.models && options.models.length ? options.models : resolveModels();
+    options.models && options.models.length
+      ? options.models.map((m) => (m === 'gemini-2.5-flash' ? 'gemini-3.8-flash' : m))
+      : resolveModels();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const deadlineMs = options.deadlineMs ?? DEFAULT_DEADLINE_MS;
   const attemptsPerModel = options.attemptsPerModel ?? DEFAULT_ATTEMPTS_PER_MODEL;
