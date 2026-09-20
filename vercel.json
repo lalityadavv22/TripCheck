@@ -3,8 +3,13 @@
   "framework": "vite",
   "buildCommand": "npm run build:web",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "server/cities.pbf"
+    }
+  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/api/(.*)", "destination": "/api/index?__route__=$1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
